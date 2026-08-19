@@ -10,6 +10,8 @@ human yes, `Target` is where a run goes, `Match` decides whether an assert holds
 `Run` walks a case through both, and `Check` proves the contract itself.
 """
 
+import atexit
+import hashlib
 import importlib
 import json
 import re
@@ -140,6 +142,10 @@ class Confirm:
 
     APPROVED = 0
     DISMISSED = 2
+    # A launch that found a window already showing this file and raised it. Neither
+    # 0 nor 2 would be true: nobody confirmed, and nobody walked away either — the
+    # answer belongs to the window that has the file, and this process never hears it.
+    HANDED_OFF = 3
 
     decided = threading.Event()
     app_handle = None  # set by Window.open; None on the browser path
@@ -176,17 +182,32 @@ class View:
         """The ASGI app: one route to look, one to say yes.
 
         Built here rather than at import time because `run` and `check` never
-        serve anything, and importing MonsterUI costs a second they should not pay.
+        serve anything, and importing the page costs a second they should not pay.
 
-        pico=False: MonsterUI already ships FrankenUI + Tailwind, and leaving Pico
-        on loads a second CSS reset that fights the first. The theme is slate so
-        the page is grey and a divergence is the only coloured thing on it.
+        The CSS is VENDORED and served from this process, never linked to a CDN:
+        the window has to work on a plane. `heroui.min.css` is HeroUI's own
+        prebuilt file — component classes only, no Tailwind utilities, which is
+        why `theme.css` beside it carries both the Catppuccin palette and the
+        eight layout rules this screen needs.
+
+        pico=False: HeroUI brings its own reset, and leaving Pico on loads a
+        second one that fights it.
         """
         from app import App
-        from fasthtml.common import fast_app
-        from monsterui.all import Theme
+        from fasthtml.common import Link, fast_app
 
-        page = fast_app(hdrs=Theme.slate.headers(), pico=False)[0]
+        # `static_path` and not a route of our own: FastHTML already answers any
+        # request ending in a static extension from that folder, and a hand-written
+        # `/css/...` route never sees the request — it 404s from the static handler
+        # first. Measured, not guessed.
+        page = fast_app(
+            pico=False,
+            static_path=str(ROOT / "assets"),
+            hdrs=(
+                Link(rel="stylesheet", href="/heroui.min.css"),
+                Link(rel="stylesheet", href="/theme.css"),
+            ),
+        )[0]
 
         # A `def` and not a lambda because FastHTML resolves a param from its
         # ANNOTATION, and a lambda cannot carry one: without it the param is
@@ -204,7 +225,47 @@ class View:
             Confirm.approve()
             return App(Eval.open(), confirmed=True)
 
+        # How a second launch finds this one. `/alive` is the handshake — a stale
+        # lock file points at a port nobody is listening on, or worse at somebody
+        # else's server, so the port alone is never taken as proof.
+        @page.get("/alive")
+        def alive():
+            return "expectagent"
+
+        @page.post("/raise")
+        def raise_window():
+            Window.focus()
+            return "ok"
+
         return page
+
+    LOCKS = Path.home() / ".expectagent"
+
+    @staticmethod
+    def lock_of(eval_file: Path | None) -> Path:
+        """The lock for THIS file. One window per eval, not one per machine.
+
+        Per file and not per process because a running window cannot be told to
+        show a different eval: pytauri exposes no `eval` or `navigate` on a window,
+        so there is no way to make it re-fetch. Focusing it for another file would
+        put the wrong case in front of someone about to confirm one.
+        """
+        key = hashlib.sha1(str(eval_file or "no-file").encode()).hexdigest()[:16]
+        return View.LOCKS / f"{key}.port"
+
+    @staticmethod
+    def running(eval_file: Path | None) -> int | None:
+        """The port of a live window for this file, or None."""
+        lock = View.lock_of(eval_file)
+        if not lock.exists():
+            return None
+        try:
+            port = int(lock.read_text().strip())
+            with urlopen(f"http://127.0.0.1:{port}/alive", timeout=0.5) as answer:
+                return port if answer.read() == b"expectagent" else None
+        except (ValueError, URLError, OSError):
+            lock.unlink(missing_ok=True)  # stale: the process died without cleaning up
+            return None
 
     @staticmethod
     def serve(eval_file: Path | None, port: int) -> None:
@@ -258,9 +319,28 @@ class View:
         The steps never happen apart, so they are one call — the entry point should
         not have to know a port exists. The window is the default; the browser is
         what is left when there is no native wheel for this Python.
+
+        A window already showing this file is RAISED instead of a second one being
+        built: two windows on one eval means two people can confirm the same case
+        and only one of them is heard.
         """
+        already = View.running(eval_file)
+        if already is not None:
+            urlopen(
+                urllib.request.Request(f"http://127.0.0.1:{already}/raise", method="POST"),
+                timeout=2,
+            ).read()
+            print("já estava aberto — trouxe a janela pra frente", flush=True)
+            # Not APPROVED: nobody confirmed anything here. The window that owns
+            # the file owns the answer, and this process never learns it.
+            return Confirm.HANDED_OFF
+
         port = View.free_port()
         View.serve(eval_file, port)
+        View.LOCKS.mkdir(parents=True, exist_ok=True)
+        lock = View.lock_of(eval_file)
+        lock.write_text(str(port))
+        atexit.register(lambda: lock.unlink(missing_ok=True))
         try:
             return Window.open(port)
         except ImportError as missing:
@@ -294,18 +374,21 @@ class Window:
 
     MONITOR = 0
 
+    handle = None  # the live window, so a second launch can raise this one
+
     @staticmethod
     def place(window) -> None:
-        """Maximize on monitor 0 — the work area, not the whole glass.
+        """Fullscreen on monitor 0.
 
-        Order matters and is the only reason this is not one line: `maximize()`
-        fills whatever monitor the window is currently on, so the window has to be
-        MOVED to monitor 0 first. Maximizing first and moving after would drag a
-        maximized window across monitors, which is not the same thing.
+        Order matters and is the only reason this is not one line: fullscreen takes
+        the monitor the window is currently ON, so the window has to be MOVED to
+        monitor 0 first. Going fullscreen and then setting a position would be
+        setting a position on a window that no longer honours one.
 
-        Maximized rather than fullscreen: fullscreen takes over the desktop and
-        hides the menu bar, and this is a window someone reads next to their
-        editor, not a presentation.
+        Fullscreen and not maximized: a case is the only thing on screen while
+        someone decides whether it is right, and on macOS fullscreen is also what
+        gives it its own Space — so it stays put instead of being buried by the
+        editor it was opened from.
         """
         monitors = window.available_monitors()
         monitor = monitors[Window.MONITOR] if len(monitors) > Window.MONITOR else monitors[0]
@@ -314,7 +397,21 @@ class Window:
         from pytauri import Position
 
         window.set_position(Position.Physical((origin_x, origin_y)))
-        window.maximize()
+        window.set_fullscreen(True)
+
+    @staticmethod
+    def focus() -> None:
+        """Bring the live window forward. Called from the HTTP thread.
+
+        Through `run_on_main_thread` because that is where the window lives: called
+        straight from the request thread these are a crash on macOS, not a no-op.
+        """
+        window = Window.handle
+        if window is None:
+            return
+        window.run_on_main_thread(
+            lambda: (window.unminimize(), window.show(), window.set_focus())
+        )
 
     @staticmethod
     def open(port: int) -> int:
@@ -341,9 +438,10 @@ class Window:
                 visible=False,
             )
 
+            Window.handle = window
             Window.place(window)
             print(
-                f"window maximized on monitor {Window.MONITOR}",
+                f"window fullscreen on monitor {Window.MONITOR}",
                 flush=True,  # stdout is a pipe here, and a buffered line reads as a hang
             )
             Confirm.app_handle = app

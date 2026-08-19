@@ -35,7 +35,12 @@ class ExpectAgent:
 
     @staticmethod
     def view(file_source: Path | None) -> int:
-        """Show the case and wait for a person. Exits 0 confirmed, 2 dismissed."""
+        """Show the case and wait for a person.
+
+        Exits 0 confirmed, 2 dismissed, 3 when a window already had this file and
+        was raised instead — that third one is nobody's answer, and a caller that
+        reads it as approval is reading a yes that was never given.
+        """
         return View.show(file_source)
 
     @staticmethod
