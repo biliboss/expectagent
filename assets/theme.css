@@ -1,0 +1,136 @@
+/* Catppuccin Latte over HeroUI, plus the layout HeroUI does not ship.
+ *
+ * Two jobs, one file, and they are separated below because they age
+ * differently: the palette is a decision, the layout is plumbing.
+ *
+ * The palette is only variables. HeroUI derives every hover, soft and border
+ * tone with `color-mix` from these, so setting the base colours re-tints the
+ * whole component set — there is no per-component overriding here, and there
+ * should never be.
+ *
+ * The layout exists because `heroui.min.css` ships COMPONENT classes and no
+ * Tailwind utilities: `.card` and `.button--primary` are in it, `w-full` and
+ * `sticky` are not. Rather than pull a whole Tailwind build in for eight rules,
+ * the eight rules are here. Everything is named for what it does on THIS screen,
+ * so nobody mistakes them for a utility framework.
+ */
+
+/* ── Catppuccin Latte ─────────────────────────────────────────────────── */
+
+:root,
+.light,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --background: #dce0e8;    /* crust — the page sits UNDER its cards */
+  --foreground: #4c4f69;    /* text */
+
+  --surface: #eff1f5;       /* base — the card is the lit surface */
+  --surface-foreground: #4c4f69;
+  --surface-secondary: #dce0e8;   /* crust */
+  --surface-tertiary: #ccd0da;    /* surface0 */
+  --overlay: #eff1f5;
+
+  --muted: #6c6f85;         /* subtext0 */
+  --default: #ccd0da;       /* surface0 */
+  --default-foreground: #4c4f69;
+
+  --accent: #1e66f5;        /* blue */
+  --accent-foreground: #eff1f5;
+
+  --success: #40a02b;       /* green */
+  --success-foreground: #eff1f5;
+  --warning: #df8e1d;       /* yellow */
+  --warning-foreground: #4c4f69;
+  --danger: #d20f39;        /* red */
+  --danger-foreground: #eff1f5;
+
+  --border: #ccd0da;        /* surface0 */
+  --separator: #ccd0da;
+  --focus: #1e66f5;
+  --link: #1e66f5;
+
+  --field-background: #e6e9ef;
+  --field-foreground: #4c4f69;
+  --field-placeholder: #9ca0b0;   /* overlay0 */
+}
+
+/* ── The layout of this screen ────────────────────────────────────────── */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  margin: 0;
+}
+
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 0;
+}
+
+.page__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+}
+
+.stack       { display: flex; flex-direction: column; gap: 0.5rem; }
+.stack--wide { gap: 2rem; }
+
+/* The confirm rides the bottom edge: a case is as long as the behaviour is, and
+ * in normal flow the ask sat below the fold. Opaque, so the trace scrolls under
+ * it and stays legible. */
+.confirm {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0.5rem;
+  background: var(--background);
+  border-top: 1px solid var(--border);
+}
+
+/* A turn's fields, label column fixed so every rule in a case lines up. As a
+ * flex row the value was squeezed to its label's width and wrapped four words
+ * deep. */
+.rules {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.25rem 1rem;
+  align-items: baseline;
+}
+.rules__label { color: var(--muted); font-size: 0.8125rem; }
+.rules__value { justify-self: start; }
+
+.trace              { width: 100%; border-collapse: collapse; }
+.trace__position    { width: 2.5rem; vertical-align: top; padding: 0.5rem 0; color: var(--muted); font-size: 0.8125rem; }
+.trace__turn        { vertical-align: top; padding: 0.5rem 0; }
+.trace__happened    { color: var(--danger); font-size: 0.8125rem; padding-top: 0.25rem; }
+
+/* The runs list: the whole row is the control. */
+.runs__row          { cursor: pointer; }
+.runs__row:hover    { background: var(--surface-secondary); }
+
+.muted   { color: var(--muted); font-size: 0.8125rem; }
+.raw     { width: 100%; margin-top: 1rem; }
+.raw pre { overflow-x: auto; background: var(--surface); padding: 1rem; border-radius: var(--radius); }
+
+/* Code, which HeroUI has no component for. Not `.kbd`: that one carries
+ * `word-spacing:-.25rem` so a keycap reads as "⌘⏎", and on a sentence it glued
+ * every word together — "Pegueiolink,jáestoumontando." The keycap keeps `.kbd`;
+ * anything with words in it gets this. */
+.code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.8125rem;
+  background: var(--surface-tertiary);
+  color: var(--foreground);
+  border-radius: calc(var(--radius) * 0.75);
+  padding: 0.15rem 0.45rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

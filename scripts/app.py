@@ -6,47 +6,69 @@ atoms nest under the screen they belong to. Every class is named like a componen
 because `__new__` returns the element: `App.EvalsTemplate.RunViewWidget.Turn(t)`,
 never an instance to render later.
 
-Only MonsterUI components, no custom CSS or HTML. The screen is grey on purpose:
-a divergence is the only coloured thing on it, so the eye lands there before
-reading a word.
+The vocabulary is HeroUI's, written as classes on plain elements: `card`,
+`card__header`, `button button--primary`, `chip chip--danger`, `kbd`. There is no
+React here and none is needed — every one of these screens is static, and the one
+interactive thing on them is a form post. HeroUI ships those classes prebuilt in
+`assets/heroui.min.css`, so nothing on this page is compiled at install time.
 
-Reading the file, and the git behind it, lives in `core.py`.
+What HeroUI does NOT ship is Tailwind's utilities, so the handful of layout
+classes (`page`, `stack`, `confirm`, `rules`, `trace`) are ours and live in
+`assets/theme.css`, next to the Catppuccin Latte palette.
+
+Reading the file, and the git behind it, lives in `shared.py`.
 """
 
 import shared
 from shared import Eval
-from fasthtml.common import FT, Div, Thead, Tr
-from monsterui.all import (
-    Button,
-    ButtonT,
-    Card,
-    CodeBlock,
-    CodeSpan,
-    Container,
-    Details,
-    DivCentered,
-    DivFullySpaced,
-    DivLAligned,
-    DivVStacked,
+from fasthtml.common import (
     H1,
+    H2,
     H3,
-    H4,
-    Label,
-    LabelT,
-    Small,
-    Strong,
-    Subtitle,
+    FT,
+    Code,
+    Details,
+    Div,
+    P,
+    Pre,
+    Span,
     Summary,
     Table,
     Tbody,
     Td,
-    TextPresets,
     Th,
+    Thead,
+    Tr,
 )
 
 
 class App:
     """Every screen, and the choice between them."""
+
+    class Card:
+        """The one shape every screen is built from: HeroUI's card, filled in.
+
+        Written once because all five screens are a title, a line under it, and a
+        body — repeating the four BEM classes at each call site is where a
+        `card__title` eventually becomes a `card_title` and nobody notices.
+        """
+
+        def __new__(cls, *body, title=None, under=None, footer=None) -> FT:
+            head = (
+                Div(
+                    H2(title, cls="card__title") if title else "",
+                    P(under, cls="card__description") if under else "",
+                    cls="card__header",
+                )
+                if title or under
+                else ""
+            )
+            return Div(
+                head,
+                Div(*body, cls="card__content"),
+                Div(footer, cls="card__footer") if footer else "",
+                cls="card",
+            )
 
     class SplashTemplate:
         """Before the first run: what was asked, and nothing pretending to be a result.
@@ -66,36 +88,29 @@ class App:
             """
 
             def __new__(cls) -> FT:
-                return DivFullySpaced(
-                    Small("nada é construído antes daqui"),
-                    Button(
+                return Div(
+                    Span("nada é construído antes daqui", cls="muted"),
+                    Div(
                         "confirmar",
-                        Small("⌘⏎", cls="ml-2"),
-                        cls=ButtonT.primary,
+                        Span("⌘⏎", cls="kbd"),
+                        cls="button button--primary",
                         hx_post="/confirm",
                         hx_target="#eval-body",
                         hx_swap="outerHTML",
-                        hx_trigger="click, keydown[(metaKey||ctrlKey)&&key==\'Enter\'] from:body",
+                        hx_trigger="click, keydown[(metaKey||ctrlKey)&&key=='Enter'] from:body",
                     ),
-                    # Sticky, because a case is as long as the behaviour is: this one
-                    # runs past the viewport, and in the card's footer the ask sat
-                    # below the fold — a confirmation screen whose confirmation you
-                    # have to go looking for. It rides the bottom edge instead, over
-                    # an opaque bar so the trace scrolls under it and stays legible.
-                    cls="sticky bottom-0 bg-background border-t border-border py-4 px-2",
+                    cls="confirm",
                 )
 
         def __new__(cls, spec: list) -> FT:
-            # The confirm is a SIBLING of the card, not its footer: a sticky element
-            # cannot leave its parent's box, and the footer's box is the bar itself.
+            # The confirm is a SIBLING of the card, not inside it: a sticky element
+            # cannot leave its parent's box, and a footer's box is the bar itself.
             # Sharing a parent with the whole trace is what gives it room to ride.
             return Div(
-                Card(
+                App.Card(
                     App.EvalsTemplate.RunViewWidget.Cases(spec),
-                    header=DivCentered(
-                        H1("é isso que ele tem que fazer?"),
-                        Subtitle("confirme, e o agente é construído contra isto"),
-                    ),
+                    title="é isso que ele tem que fazer?",
+                    under="confirme, e o agente é construído contra isto",
                 ),
                 cls.Confirm(),
             )
@@ -108,13 +123,11 @@ class App:
         """
 
         def __new__(cls, spec: list) -> FT:
-            return Card(
+            return App.Card(
                 App.EvalsTemplate.RunViewWidget.Cases(spec),
-                header=DivCentered(
-                    H1("confirmado"),
-                    Subtitle("agora o agente pode ser construído contra isto"),
-                ),
-                footer=Small(CodeSpan("expectagent run")),
+                title="confirmado",
+                under="agora o agente pode ser construído contra isto",
+                footer=Code("expectagent run", cls="code"),
             )
 
     class UnreadableTemplate:
@@ -128,16 +141,11 @@ class App:
         """
 
         def __new__(cls, content: str, why: str) -> FT:
-            return Card(
-                DivVStacked(
-                    Small(why, cls=TextPresets.muted_sm),
-                    CodeBlock(content[:2000]),
-                    cls="items-start gap-3 w-full",
-                ),
-                header=DivCentered(
-                    H1("não deu pra ler este arquivo"),
-                    Subtitle("nada é confirmado a partir daqui"),
-                ),
+            return App.Card(
+                P(why, cls="muted"),
+                Pre(Code(content[:2000])),
+                title="não deu pra ler este arquivo",
+                under="nada é confirmado a partir daqui",
             )
 
     class FileSourceNotSetTemplate:
@@ -149,17 +157,16 @@ class App:
         """
 
         def __new__(cls) -> FT:
-            return Card(
-                DivVStacked(
-                    Subtitle("aponte para um arquivo de eval:"),
-                    CodeSpan("expectagent view caminho/do/eval.yaml"),
-                    Small("ou comece pelo exemplo:"),
-                    CodeSpan("expectagent view examples/ping_pong.yaml"),
+            return App.Card(
+                Div(
+                    P("aponte para um arquivo de eval:"),
+                    Code("expectagent view caminho/do/eval.yaml", cls="code"),
+                    P("ou comece pelo exemplo:", cls="muted"),
+                    Code("expectagent view examples/ping_pong.yaml", cls="code"),
+                    cls="stack",
                 ),
-                header=DivCentered(
-                    H1("nenhum arquivo"),
-                    Subtitle("o comando rodou sem dizer o que abrir"),
-                ),
+                title="nenhum arquivo",
+                under="o comando rodou sem dizer o que abrir",
             )
 
     class EvalsTemplate:
@@ -176,9 +183,9 @@ class App:
             class Turn:
                 """Atom — one turn of a trace.
 
-                A turn that diverged trades its number for `✗` and is the one element
-                on the screen with colour; `happened:` sits under it, in the runner's
-                own words.
+                A turn that diverged trades its number for a red chip and is the one
+                element on the screen with colour; `happened:` sits under it, in the
+                runner's own words.
                 """
 
                 class Rules:
@@ -213,9 +220,7 @@ class App:
                         return [
                             leaf
                             for key, inner in value.items()
-                            for leaf in App.EvalsTemplate.RunViewWidget.Turn.Rules.leaves(
-                                inner, f"{path} {key}".strip()
-                            )
+                            for leaf in deep(inner, f"{path} {key}".strip())
                         ]
 
                     def __new__(cls, verb: str, value) -> FT:
@@ -228,11 +233,11 @@ class App:
                                 part
                                 for path, text in cls.leaves(value)
                                 for part in (
-                                    Small(f"{verb} {path}".strip(), cls=TextPresets.muted_sm),
-                                    CodeSpan(text, cls="justify-self-start"),
+                                    Span(f"{verb} {path}".strip(), cls="rules__label"),
+                                    Code(text, cls="code rules__value"),
                                 )
                             ],
-                            cls="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 items-baseline w-full",
+                            cls="rules",
                         )
 
                 def __new__(cls, turn: dict, position: int) -> FT:
@@ -246,18 +251,18 @@ class App:
                     fields = {k: v for k, v in turn.items() if k not in (verb, "happened")}
                     return Tr(
                         Td(
-                            Label("✗", cls=LabelT.destructive) if broke else Small(str(position)),
-                            cls="align-top w-10 pt-1",
+                            Span("✗", cls="chip chip--danger") if broke else str(position),
+                            cls="trace__position",
                         ),
                         Td(
                             cls.Rules(verb, value)
                             if isinstance(value, dict)
-                            else CodeSpan(f"{verb}: {value}"),
+                            else Code(f"{verb}: {value}", cls="code"),
                             *[cls.Rules(name, held) for name, held in fields.items()],
-                            Small(f"happened: {turn['happened']}", cls=TextPresets.muted_sm)
+                            Div(f"happened: {turn['happened']}", cls="trace__happened")
                             if broke
                             else "",
-                            cls="align-top space-y-1",
+                            cls="trace__turn",
                         ),
                     )
 
@@ -267,7 +272,7 @@ class App:
                 Numbered rows because the sequence is real: in this format the ORDER
                 of the lines IS the assertion.
 
-                A table and not `Steps`: the stepper equalised its items and opened
+                A table and not a stepper: the stepper equalised its items and opened
                 130px of nothing between one-line turns, so a nine-turn case ran three
                 screens for the content of one. Rows put the numbers on a column the
                 eye can run down, which is the only thing the rail was buying.
@@ -281,7 +286,7 @@ class App:
                                 for i, t in enumerate(turns, 1)
                             ]
                         ),
-                        cls="uk-table-small w-full",
+                        cls="trace",
                     )
 
             class Guardrails:
@@ -297,25 +302,18 @@ class App:
                 KINDS = ("tools", "budget", "judge", "min_score")
 
                 def __new__(cls, asserts: list) -> FT:
-                    return Card(
+                    return App.Card(
                         *[
                             App.EvalsTemplate.RunViewWidget.Turn.Rules(
                                 Eval.turn_verb(a), a[Eval.turn_verb(a)]
                             )
                             for a in asserts
                         ],
-                        header=Small("vale para o caso inteiro", cls=TextPresets.muted_sm),
-                        cls="mt-4 w-full",
+                        under="vale para o caso inteiro",
                     )
 
             class Cases:
-                """Molecule — every case, name then trace. Also renders a bare spec.
-
-                A case whose value is a STRING is a run from the earlier format, when
-                a passing case collapsed to `demo: PASSED`. Old runs are kept verbatim
-                because a run is a measurement, so this reads them instead of raising:
-                the shape came from outside, and outside shapes get a fallback.
-                """
+                """Molecule — every case, name then trace. Also renders a bare spec."""
 
                 # The reserved entry is SETTINGS, not a case: it declares the
                 # vocabulary and where the run goes. Rendered as a case it got the
@@ -324,24 +322,27 @@ class App:
                 SETTINGS = "expectagent"
 
                 class Case:
-                    """Molecule — one case: its name, its ordered trace, its guardrails."""
+                    """Molecule — one case: its name, its ordered trace, its guardrails.
+
+                    A case whose value is a STRING is a run from the earlier format,
+                    when a passing case collapsed to `demo: PASSED`. Old runs are kept
+                    verbatim because a run is a measurement, so this reads them
+                    instead of raising.
+                    """
 
                     def __new__(cls, name: str, turns) -> FT:
                         if not isinstance(turns, list):
-                            return Div(H4(name), Small(str(turns)), cls="w-full space-y-2")
+                            return Div(H3(name), P(str(turns), cls="muted"), cls="stack")
                         widget = App.EvalsTemplate.RunViewWidget
-                        steps = [t for t in turns if Eval.turn_verb(t) not in widget.Guardrails.KINDS]
+                        steps = [
+                            t for t in turns if Eval.turn_verb(t) not in widget.Guardrails.KINDS
+                        ]
                         rules = [t for t in turns if Eval.turn_verb(t) in widget.Guardrails.KINDS]
-                        # A plain block, not `DivVStacked`: that one carries
-                        # `items-center`, and an `items-start` beside it does not win —
-                        # same Tailwind family, so the stylesheet's order decides, not
-                        # the attribute's. The case name drifted to the middle while
-                        # its own trace sat left.
                         return Div(
-                            H4(name),
+                            H3(name),
                             widget.Trace(steps),
                             widget.Guardrails(rules) if rules else "",
-                            cls="w-full space-y-2",
+                            cls="stack",
                         )
 
                 def __new__(cls, cases: list) -> FT:
@@ -352,20 +353,17 @@ class App:
                             for name, turns in case.items()
                             if name != cls.SETTINGS
                         ],
-                        cls="w-full space-y-8",
+                        cls="stack stack--wide",
                     )
 
             def __new__(cls, run: dict) -> FT:
-                return Card(
+                verdict = run.get("verdict", "?")
+                return App.Card(
                     cls.Cases(run.get("cases", [])),
-                    header=DivFullySpaced(
-                        H3(run.get("run", "run")),
-                        Label(
-                            run.get("verdict", "?"),
-                            cls=LabelT.secondary
-                            if run.get("verdict") == "PASS"
-                            else LabelT.destructive,
-                        ),
+                    title=run.get("run", "run"),
+                    footer=Span(
+                        verdict,
+                        cls=f"chip chip--{'success' if verdict == 'PASS' else 'danger'}",
                     ),
                 )
 
@@ -406,15 +404,16 @@ class App:
 
                 def __new__(cls, run: dict, index: int, selected: bool) -> FT:
                     when = run.get("run", "?")
+                    verdict = run.get("verdict", "?")
                     return Tr(
-                        Td(Strong(when) if selected else when),
+                        Td(Span(when, style="font-weight:600") if selected else when),
                         Td(
-                            Label(run["verdict"], cls=LabelT.destructive)
-                            if run.get("verdict") != "PASS"
+                            Span(verdict, cls="chip chip--danger")
+                            if verdict != "PASS"
                             else ""
                         ),
-                        Td(Small(App.EvalsTemplate.RunsWidget.Broke(run))),
-                        cls="cursor-pointer",
+                        Td(App.EvalsTemplate.RunsWidget.Broke(run), cls="muted"),
+                        cls="runs__row",
                         hx_get=f"/?run={index}",
                         hx_target="#eval-body",
                         hx_swap="outerHTML",
@@ -422,44 +421,47 @@ class App:
                     )
 
             def __new__(cls, runs: list, selected_run: dict) -> FT:
-                return Card(
+                return App.Card(
                     Table(
                         Thead(Tr(Th("quando"), Th(""), Th("onde quebrou"))),
                         Tbody(*[cls.Row(r, i, r is selected_run) for i, r in enumerate(runs)]),
+                        cls="table",
                     ),
-                    header=H3(f"{len(runs)} runs"),
+                    title=f"{len(runs)} runs",
                 )
 
         def __new__(cls, runs: list, selected: int) -> FT:
-            # A block, for the same reason the case list is one: `DivVStacked` centres
-            # its children, and the run card came out narrow in the middle of a wide
-            # window with the trace crammed into half of it.
             return Div(
                 cls.RunViewWidget(runs[selected]),
                 cls.RunsWidget(runs, runs[selected]),
-                cls="w-full space-y-4",
+                cls="stack stack--wide",
             )
 
     def __new__(cls, file_source: str | None, selected: int = 0, confirmed: bool = False) -> FT:
         """Pick the screen the state deserves, and wrap it in the shell.
 
-        Four states, and each has a screen: no file, a file with no runs, that
-        same file once someone confirmed it, and a file with runs. The shell — the name, the origin, the raw source — only
-        makes sense once a file exists, so the first state renders bare.
+        Five states, and each has a screen: no file, a file that will not read, a
+        file with no runs, that same file once someone confirmed it, and a file
+        with runs. The shell — the name, the vocabulary, the origin, the raw
+        source — only makes sense once a file exists, so the first states render
+        bare.
 
         The whole body carries the htmx id, so selecting a run swaps the view AND
         the list in one exchange — two targets would let the selection drift out
         of step with what is on screen.
         """
         if file_source is None:
-            return Container(cls.FileSourceNotSetTemplate(), id="eval-body")
+            return Div(cls.FileSourceNotSetTemplate(), cls="page", id="eval-body")
 
         try:
             spec, runs = Eval.read(file_source)
         except Exception as unreadable:
-            return Container(
-                cls.UnreadableTemplate(file_source, str(unreadable)), id="eval-body"
+            return Div(
+                cls.UnreadableTemplate(file_source, str(unreadable)),
+                cls="page",
+                id="eval-body",
             )
+
         # `?run=` comes from the address bar, so it is clamped rather than trusted:
         # an out-of-range index would be an IndexError served as a 500.
         selected = min(max(selected, 0), len(runs) - 1) if runs else 0
@@ -474,14 +476,15 @@ class App:
             ),
             [],
         )
-        return Container(
-            DivFullySpaced(
-                DivLAligned(
-                    H3(shared.EVAL_FILE.name),
-                    Small(" · ".join(verbs), cls=TextPresets.muted_sm) if verbs else "",
-                    cls="gap-3 items-baseline",
+        return Div(
+            Div(
+                Div(
+                    H1(shared.EVAL_FILE.name, style="font-size:1.25rem;margin:0"),
+                    Span(" · ".join(verbs), cls="muted") if verbs else "",
+                    style="display:flex;gap:.75rem;align-items:baseline",
                 ),
-                Subtitle(Eval.origin()),
+                Span(Eval.origin(), cls="muted"),
+                cls="page__head",
             ),
             cls.EvalsTemplate(runs, selected)
             if runs
@@ -489,8 +492,10 @@ class App:
             # The raw file, collapsed: open it was forty lines of teaching
             # comments burying four lines of trace, and closed it is one click.
             Details(
-                Summary(Small(shared.EVAL_FILE.name)),
-                CodeBlock(file_source, code_cls="language-yaml"),
+                Summary(Span(shared.EVAL_FILE.name, cls="muted")),
+                Pre(Code(file_source)),
+                cls="raw",
             ),
+            cls="page",
             id="eval-body",
         )
