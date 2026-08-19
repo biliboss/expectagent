@@ -61,6 +61,26 @@ class View:
         raise SystemExit(f"the view never answered at {url} — run scripts/view.py to see why")
 
     @staticmethod
+    def resolve(argv: list[str]) -> Path:
+        """Which eval file the command was pointed at. Raises when it is not there."""
+        named = [arg for arg in argv if not arg.startswith("-")]
+        chosen = Path(named[0]).resolve() if named else DEFAULT_EVAL
+        if not chosen.is_file():
+            raise SystemExit(f"no such file: {chosen}")
+        return chosen
+
+    @staticmethod
+    def show(eval_file: Path) -> int:
+        """Serve it, open it, and stay up until Ctrl-C.
+
+        The three steps never happen apart, so they are one call — the entry point
+        should not have to know a port exists.
+        """
+        port = View.free_port()
+        View.serve(eval_file, port)
+        return View.open(port)
+
+    @staticmethod
     def url(port: int) -> str:
         return f"http://127.0.0.1:{port}/"
 
