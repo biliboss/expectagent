@@ -15,7 +15,7 @@ Reading the file, and the git behind it, lives in `core.py`.
 
 import shared
 from shared import Eval
-from fasthtml.common import FT, Thead, Tr
+from fasthtml.common import FT, Div, Thead, Tr
 from monsterui.all import (
     Button,
     ButtonT,
@@ -81,16 +81,27 @@ class App:
                         hx_swap="outerHTML",
                         hx_trigger="click, keydown[(metaKey||ctrlKey)&&key==\'Enter\'] from:body",
                     ),
+                    # Sticky, because a case is as long as the behaviour is: this one
+                    # runs past the viewport, and in the card's footer the ask sat
+                    # below the fold — a confirmation screen whose confirmation you
+                    # have to go looking for. It rides the bottom edge instead, over
+                    # an opaque bar so the trace scrolls under it and stays legible.
+                    cls="sticky bottom-0 bg-background border-t border-border py-4 px-2",
                 )
 
         def __new__(cls, spec: list) -> FT:
-            return Card(
-                App.EvalsTemplate.RunViewWidget.Cases(spec),
-                header=DivCentered(
-                    H1("é isso que ele tem que fazer?"),
-                    Subtitle("confirme, e o agente é construído contra isto"),
+            # The confirm is a SIBLING of the card, not its footer: a sticky element
+            # cannot leave its parent's box, and the footer's box is the bar itself.
+            # Sharing a parent with the whole trace is what gives it room to ride.
+            return Div(
+                Card(
+                    App.EvalsTemplate.RunViewWidget.Cases(spec),
+                    header=DivCentered(
+                        H1("é isso que ele tem que fazer?"),
+                        Subtitle("confirme, e o agente é construído contra isto"),
+                    ),
                 ),
-                footer=cls.Confirm(),
+                cls.Confirm(),
             )
 
     class ConfirmedTemplate:
