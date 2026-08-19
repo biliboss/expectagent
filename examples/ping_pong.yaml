@@ -1,0 +1,121 @@
+- demo:
+  - user: Ping
+  - agent: Pong
+
+- demo2:
+  - user: Como dar cambalhota
+  - skill: playbook
+  - skill_resource: como_dar_cambalhota.md
+  - agent: Pongggg
+
+# As runs moram no documento debaixo do `---`, num array, a mais nova em cima.
+# `python3 demo.py` prepende a run nova e não toca nas de baixo.
+#
+# Toda run replica TODOS os turnos, e a linha do turno espelha o SPEC — assim a
+# run se lê contra ele, linha por linha. `happened:` só aparece onde os dois
+# divergiram, e diz o que de fato ocorreu; case sem `happened:` é case que passou.
+# A falha PARA no passo que quebrou: o que viria depois é outra execução, não a
+# que o spec descreve.
+#
+#     - run: "2026-08-19T11:39Z"
+#       verdict: FAIL
+#       cases:
+#       - demo:
+#         - user: "Ping"
+#         - agent: "Pong"
+#       - demo2:
+#         - user: "Como dar cambalhota"
+#         - skill: playbook
+#           happened: skill(xpto)
+#
+#     - run: "2026-08-19T11:38Z"
+#       verdict: FAIL
+#       cases:
+#       - demo:
+#         - user: "Ping"
+#         - agent: "Pong"
+#       - demo2:
+#         - user: "Como dar cambalhota"
+#         - skill: playbook
+#         - skill_resource: como_dar_cambalhota.md
+#           happened: nada, respondeu sem chamar tool
+
+---
+- run: "2026-08-19T11:50Z"
+  verdict: PASS
+  cases:
+  - demo:
+    - user: "Ping"
+    - agent: "Pong"
+  - demo2:
+    - user: "Como dar cambalhota"
+    - skill: playbook
+    - skill_resource: como_dar_cambalhota.md
+    - agent: "Pongggg"
+
+- run: "2026-08-19T11:49Z"
+  verdict: FAIL
+  cases:
+  - demo:
+    - user: "Ping"
+    - agent: "Pong"
+      happened: "pong"
+  - demo2:
+    - user: "Como dar cambalhota"
+    - skill: playbook
+    - skill_resource: como_dar_cambalhota.md
+    - agent: "Pongggg"
+
+- run: "2026-08-19T11:46Z"
+  verdict: PASS
+  cases:
+  - demo:
+    - user: "Ping"
+    - agent: "Pong"
+  - demo2:
+    - user: "Como dar cambalhota"
+    - skill: playbook
+    - skill_resource: como_dar_cambalhota.md
+    - agent: "Pongggg"
+
+- run: "2026-08-19T11:44Z"
+  verdict: FAIL
+  cases:
+  - demo:
+    - user: "Ping"
+    - agent: "Pong"
+  - demo2:
+    - user: "Como dar cambalhota"
+    - skill: playbook
+    - skill_resource: resources/como_dar_cambalhota.md
+      error: esperava skill_resource(como_dar_cambalhota.md)
+
+- run: "2026-08-19T11:41Z"
+  verdict: FAIL
+  cases:
+  - demo:
+    - user: "Ping"
+    - agent: "Pong"
+  - demo2:
+    - user: "Como dar cambalhota"
+    - skill: null
+      error: não chamou skill(playbook)
+
+- run: "2026-08-19T11:40Z"
+  verdict: FAIL
+  cases:
+  - demo: PASSED
+  - demo2:
+    - user: "Como dar cambalhota"
+    - skill: null
+      error: não chamou skill(playbook)
+
+- run: "2026-08-19T11:40Z"
+  verdict: FAIL
+  cases:
+  - demo: PASSED
+  - demo2:
+    - user: "Como dar cambalhota"
+    - skill: null
+      error: não chamou skill(playbook)
+

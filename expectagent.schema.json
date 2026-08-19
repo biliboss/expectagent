@@ -1,0 +1,829 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:expectagent:v1",
+  "title": "Expect Agent",
+  "description": "O contrato do arquivo de eval. Serve os dois documentos YAML do mesmo arquivo: o spec em cima do `---`, as runs embaixo. Um turno serve um caso de um turno so e um caso multiturno, sem diferenca de forma: a ORDEM das linhas e a assercao, e a run para no primeiro turno que divergir. Todo assert devolve score e razao: deterministico da 0 ou 1, `judge` da 0..1, e o caso passa quando o score ponderado cruza o `min_score`. A tabela de origem de cada primitiva esta no design.md.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/specDoc"
+    },
+    {
+      "$ref": "#/$defs/runsDoc"
+    }
+  ],
+  "$defs": {
+    "specDoc": {
+      "title": "spec",
+      "description": "O documento de cima: um item por caso, o NOME do caso e a chave.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "runsDoc": {
+      "title": "runs",
+      "description": "O documento de baixo: uma entrada por execucao, mais nova primeiro. Run passada nunca e reescrita — ela e uma medicao.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/run"
+      }
+    },
+    "case": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "$ref": "#/$defs/turn"
+        },
+        "contains": {
+          "anyOf": [
+            {
+              "required": [
+                "agent"
+              ]
+            },
+            {
+              "required": [
+                "tool"
+              ]
+            },
+            {
+              "required": [
+                "tools"
+              ]
+            },
+            {
+              "required": [
+                "budget"
+              ]
+            }
+          ]
+        },
+        "description": "Os turnos. `contains` exige ao menos um assert deterministico: um caso que so tem juiz nao falseia, e por isso e recusado aqui e nao num README que ninguem le."
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "run",
+        "verdict",
+        "cases"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "type": "string",
+          "description": "Quando rodou, ISO 8601."
+        },
+        "verdict": {
+          "enum": [
+            "PASS",
+            "FAILED"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "description": "Contra QUEM rodou: o modelo, o framework, o endpoint. E o que deixa o mesmo spec valer para varios alvos."
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/case"
+          }
+        },
+        "score": {
+          "description": "O score ponderado do run, 0..1.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "turn": {
+      "description": "Um turno, ou um assert sobre a sequencia inteira. A posicao na lista e a ordem esperada, e ela E a assercao.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/userTurn"
+        },
+        {
+          "$ref": "#/$defs/agentTurn"
+        },
+        {
+          "$ref": "#/$defs/toolTurn"
+        },
+        {
+          "$ref": "#/$defs/toolsAssert"
+        },
+        {
+          "$ref": "#/$defs/budgetAssert"
+        },
+        {
+          "$ref": "#/$defs/judgeAssert"
+        },
+        {
+          "$ref": "#/$defs/scoreAssert"
+        }
+      ]
+    },
+    "userTurn": {
+      "title": "user",
+      "description": "O que entra. Nao e assercao, e entrada — por isso e string crua e nao matcher.",
+      "type": "object",
+      "required": [
+        "user"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "happened": {
+          "$ref": "#/$defs/happened"
+        }
+      }
+    },
+    "agentTurn": {
+      "title": "agent",
+      "description": "O que tem que sair. String = igualdade exata; objeto = matcher.",
+      "type": "object",
+      "required": [
+        "agent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/expected"
+        },
+        "happened": {
+          "$ref": "#/$defs/happened"
+        }
+      }
+    },
+    "toolTurn": {
+      "title": "tool",
+      "description": "Uma chamada de ferramenta. `mock` troca a execucao pelo dado; sem ele a ferramenta roda de verdade, e `returns` afirma sobre o resultado real. Os dois juntos sao recusados: afirmar sobre o proprio mock e tautologia.",
+      "type": "object",
+      "required": [
+        "tool"
+      ],
+      "additionalProperties": false,
+      "not": {
+        "required": [
+          "mock",
+          "returns"
+        ]
+      },
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "O nome da ferramenta, como o adapter reporta."
+        },
+        "args": {
+          "description": "Argumentos esperados, comparados como SUBCONJUNTO: as chaves declaradas tem que bater, chave a mais na chamada real nao reprova. Jest `expect.objectContaining` · sinon `calledWithMatch`.",
+          "type": [
+            "object",
+            "string",
+            "number",
+            "boolean",
+            "array"
+          ]
+        },
+        "mock": {
+          "description": "Se presente, a ferramenta NAO roda: devolve isto. E o andaime do comeco — o proximo passo e apagar o mock e afirmar com `returns`.",
+          "type": [
+            "object",
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "null"
+          ]
+        },
+        "returns": {
+          "description": "Assercao sobre o resultado REAL da ferramenta.",
+          "$ref": "#/$defs/expected"
+        },
+        "times": {
+          "description": "Quantas vezes esta ferramenta e chamada. Jest `toHaveBeenCalledTimes` · sinon `calledOnce`. Inteiro, ou `range`.",
+          "$ref": "#/$defs/intOrRange"
+        },
+        "happened": {
+          "$ref": "#/$defs/happened"
+        }
+      }
+    },
+    "toolsAssert": {
+      "title": "tools",
+      "description": "Assert sobre a SEQUENCIA inteira de chamadas. Ordem nao e um flag: sao primitivas que se compoem. `includes` e ordenado e permissivo, `exactly` e fechado, `only` e allowlist, `before`/`nth` afirmam posicao sem afirmar o resto.",
+      "type": "object",
+      "required": [
+        "tools"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "happened": {
+          "$ref": "#/$defs/happened"
+        },
+        "tools": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "includes": {
+              "description": "Estas, NESTA ordem; outras chamadas no meio nao reprovam. unittest.mock `assert_has_calls(any_order=False)` · agentevals `subset`.",
+              "$ref": "#/$defs/callList"
+            },
+            "any_order": {
+              "description": "Todas aparecem, ordem indiferente. `assert_has_calls(any_order=True)` · unittest `assertCountEqual` · agentevals `unordered`.",
+              "$ref": "#/$defs/callList"
+            },
+            "exactly": {
+              "description": "Estas, nesta ordem, e NADA mais. `mock_calls == [...]` · agentevals `strict`.",
+              "$ref": "#/$defs/callList"
+            },
+            "only": {
+              "description": "Allowlist: pode chamar destas, em qualquer ordem e quantidade, e de nenhuma outra. E a forma de guardrail — o que importa e o que NAO pode ser chamado.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "must": {
+              "description": "Chamou, em algum ponto. `assert_any_call` · Jest `toHaveBeenCalledWith`.",
+              "$ref": "#/$defs/callList"
+            },
+            "never": {
+              "description": "Nao chamou. `assert_not_called` · Jest `not.toHaveBeenCalled`.",
+              "$ref": "#/$defs/callList"
+            },
+            "before": {
+              "description": "Par ordenado, sem afirmar o resto da sequencia. sinon `assert.callOrder` · jest-extended `toHaveBeenCalledBefore`.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "first",
+                  "then"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "first": {
+                    "type": "string"
+                  },
+                  "then": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "nth": {
+              "description": "A chamada de indice N foi esta. Indice 1-based; -1 e a ultima. Jest `toHaveBeenNthCalledWith` · sinon `firstCall`/`lastCall`.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "index",
+                  "tool"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "index": {
+                    "type": "integer"
+                  },
+                  "tool": {
+                    "type": "string"
+                  },
+                  "args": {
+                    "type": [
+                      "object",
+                      "string",
+                      "number",
+                      "boolean",
+                      "array"
+                    ]
+                  }
+                }
+              }
+            },
+            "times": {
+              "description": "Quantas chamadas houve no total. Inteiro, ou `range`.",
+              "$ref": "#/$defs/intOrRange"
+            }
+          }
+        }
+      }
+    },
+    "callList": {
+      "description": "Uma lista de chamadas. String = so o nome da ferramenta; objeto = nome mais args como subconjunto.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "tool"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "tool": {
+                "type": "string"
+              },
+              "args": {
+                "type": [
+                  "object",
+                  "string",
+                  "number",
+                  "boolean",
+                  "array"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "budgetAssert": {
+      "title": "budget",
+      "description": "O que o caso nao pode passar. E metade do motivo de avaliar 'qualquer LLM': trocar de modelo e decisao de preco. pydantic-evals `MaxDuration` · promptfoo `latency`/`cost`.",
+      "type": "object",
+      "required": [
+        "budget"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "happened": {
+          "$ref": "#/$defs/happened"
+        },
+        "budget": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "max_duration_ms": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "max_cost_usd": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "max_tokens": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "happened": {
+      "type": "string",
+      "description": "O que aconteceu de verdade. So o runner escreve, so no documento de runs, e so no turno que divergiu — os turnos depois dele nao rodam."
+    },
+    "expected": {
+      "description": "Escalar = igualdade exata (o atalho de 90% dos casos). Objeto = matcher.",
+      "oneOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "$ref": "#/$defs/matcher"
+        }
+      ]
+    },
+    "matcher": {
+      "title": "matcher",
+      "description": "O deterministico inteiro, nas familias que Jest, Chai, hamcrest, unittest e promptfoo ja nomearam. Toda chave presente tem que valer (AND). Score e 0 ou 1 — quem devolve fracao e o `judge`.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "equals": {
+          "description": "Igual, no valor. Jest `toBe`/`toEqual` · Rust `assert_eq!` · pydantic-evals `Equals`.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null",
+            "object",
+            "array"
+          ]
+        },
+        "one_of": {
+          "description": "E um destes. Chai `to.be.oneOf` · hamcrest `is_in`.",
+          "type": "array",
+          "minItems": 1
+        },
+        "contains": {
+          "description": "`all`, `any` e `none` numa chave so — come `contains-all`, `contains-any`, `not-contains` e `icontains` do promptfoo. Escalar ou lista e atalho para `all`.",
+          "oneOf": [
+            {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ],
+              "description": "Atalho: contem isto."
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "description": "Atalho: contem todos estes."
+            },
+            {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": false,
+              "properties": {
+                "all": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Todos tem que estar contidos."
+                },
+                "any": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Pelo menos um."
+                },
+                "none": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Nenhum. E o assert que pega vazamento."
+                }
+              }
+            }
+          ]
+        },
+        "matches": {
+          "description": "Casa com a expressao regular. Jest `toMatch` · Chai `to.match`.",
+          "type": "string",
+          "format": "regex"
+        },
+        "starts_with": {
+          "description": "Prefixo. Rust `str::starts_with`.",
+          "type": "string"
+        },
+        "ends_with": {
+          "description": "Sufixo. Rust `str::ends_with`.",
+          "type": "string"
+        },
+        "subset": {
+          "description": "Estas chaves batem; chave a mais no real nao reprova. Jest `toMatchObject` · dirty_equals `IsPartialDict`.",
+          "type": "object"
+        },
+        "length": {
+          "description": "Tamanho, exato ou como `range`. Jest `toHaveLength` · hamcrest `has_length`.",
+          "$ref": "#/$defs/intOrRange"
+        },
+        "not": {
+          "description": "Nega o matcher inteiro. O `.not` de Jest e Chai, e por isso e recursivo.",
+          "$ref": "#/$defs/matcher"
+        },
+        "all_of": {
+          "description": "Todos valem. hamcrest `all_of` · SpanQuery `and_`.",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/matcher"
+          }
+        },
+        "any_of": {
+          "description": "Pelo menos um vale. hamcrest `any_of` · SpanQuery `or_`.",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/matcher"
+          }
+        },
+        "prepare": {
+          "$ref": "#/$defs/prepare"
+        },
+        "similar": {
+          "description": "Parecido, com metodo declarado e piso. promptfoo `levenshtein`/`rouge-n`/`bleu`/`similar` · autoevals `Levenshtein`, `EmbeddingSimilarity`.",
+          "type": "object",
+          "required": [
+            "to",
+            "method",
+            "min"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "to": {
+              "type": "string"
+            },
+            "method": {
+              "enum": [
+                "levenshtein",
+                "rouge_l",
+                "bleu",
+                "embedding"
+              ]
+            },
+            "min": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "model": {
+              "type": "string",
+              "description": "So para `embedding`, e pinado."
+            }
+          }
+        },
+        "is": {
+          "description": "Presenca ou tipo. Jest `toBeDefined`/`toBeInstanceOf` · pydantic-evals `IsInstance`.",
+          "enum": [
+            "present",
+            "absent",
+            "string",
+            "number",
+            "integer",
+            "boolean",
+            "object",
+            "array",
+            "null"
+          ]
+        },
+        "is_valid": {
+          "description": "Parseia no formato — e casa com o schema, se vier. promptfoo `is-json`/`is-xml`/`is-sql`/`is-html` · autoevals `ValidJSON`.",
+          "type": "object",
+          "required": [
+            "format"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "enum": [
+                "json",
+                "yaml",
+                "xml",
+                "html",
+                "sql"
+              ]
+            },
+            "schema": {
+              "type": "object",
+              "description": "Um JSON Schema; so para `json` e `yaml`."
+            }
+          }
+        },
+        "range": {
+          "$ref": "#/$defs/range"
+        },
+        "weight": {
+          "description": "Quanto este assert pesa no score do caso. promptfoo `weight`.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "advisory": {
+          "description": "Mede e reporta, nao reprova. LangSmith online evaluation.",
+          "const": true
+        }
+      }
+    },
+    "range": {
+      "title": "range",
+      "description": "Uma faixa numerica. A MESMA forma serve `length`, `times` e comparacao de valor — Jest `toBeGreaterThan`/`toBeCloseTo` · pytest `approx` · Rust `approx`.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "gt": {
+          "type": "number"
+        },
+        "gte": {
+          "type": "number"
+        },
+        "lt": {
+          "type": "number"
+        },
+        "lte": {
+          "type": "number"
+        },
+        "close_to": {
+          "type": "object",
+          "required": [
+            "value",
+            "delta"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "delta": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "intOrRange": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "$ref": "#/$defs/range"
+        }
+      ]
+    },
+    "prepare": {
+      "title": "prepare",
+      "description": "Roda ANTES da comparacao. Declarado aqui, e no diff — e isso que separa de pos-processar a resposta escondido no runner.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "extract": {
+          "description": "Recorta por regex; usa o grupo 1 se houver. simple-evals `ANSWER_PATTERN_MULTICHOICE`.",
+          "type": "string",
+          "format": "regex"
+        },
+        "normalize": {
+          "description": "simple-evals `normalize_response`. `case` faz os quatro `icontains*` do promptfoo deixarem de existir.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "case",
+              "whitespace",
+              "punctuation",
+              "markdown",
+              "latex",
+              "emoji"
+            ]
+          }
+        },
+        "redact": {
+          "description": "Apaga o volatil antes de comparar. insta `redactions` · syrupy matchers.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "format": "regex"
+          }
+        }
+      }
+    },
+    "judgeAssert": {
+      "title": "judge",
+      "description": "Julgamento por modelo, com trela curta. `model` pinado e OBRIGATORIO: sem versao fixa o veredito nao reproduz, e um eval que nao reproduz nao mede. Sem `min_score` o juiz e ADVISORY — mede e reporta, nao reprova. O runner escreve `score` e `reason` de volta, como o `happened:`.",
+      "type": "object",
+      "required": [
+        "judge"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "happened": {
+          "$ref": "#/$defs/happened"
+        },
+        "judge": {
+          "type": "object",
+          "required": [
+            "model"
+          ],
+          "additionalProperties": false,
+          "oneOf": [
+            {
+              "required": [
+                "rubric"
+              ]
+            },
+            {
+              "required": [
+                "preset"
+              ]
+            },
+            {
+              "required": [
+                "pairwise"
+              ]
+            }
+          ],
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Modelo E versao, pinados. `claude-haiku-4-5-20251001`, nao `haiku`."
+            },
+            "rubric": {
+              "type": "string",
+              "minLength": 10,
+              "description": "O criterio em prosa. promptfoo `llm-rubric` · Langfuse template custom · pydantic-evals `LLMJudge`."
+            },
+            "preset": {
+              "description": "A biblioteca pronta, deduplicada de Langfuse, autoevals e promptfoo.",
+              "enum": [
+                "factuality",
+                "hallucination",
+                "correctness",
+                "relevance",
+                "conciseness",
+                "helpfulness",
+                "toxicity",
+                "safety",
+                "refusal",
+                "summarization",
+                "sql_equivalence",
+                "translation",
+                "security",
+                "context_faithfulness",
+                "context_relevance",
+                "context_recall",
+                "context_precision",
+                "g_eval",
+                "classifier"
+              ]
+            },
+            "pairwise": {
+              "description": "Compara com outra saida e diz qual e melhor. autoevals `Battle` · promptfoo `select-best` · LangSmith pairwise.",
+              "type": "object",
+              "required": [
+                "against"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "against": {
+                  "type": "string",
+                  "description": "O outro alvo, ou a saida de referencia."
+                }
+              }
+            },
+            "score": {
+              "description": "Langfuse score types.",
+              "enum": [
+                "numeric",
+                "boolean",
+                "categorical"
+              ],
+              "default": "numeric"
+            },
+            "labels": {
+              "description": "So para `categorical`.",
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "string"
+              }
+            },
+            "min_score": {
+              "description": "Trava o gate. Sem esta chave o juiz nao reprova ninguem. promptfoo `threshold`.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "weight": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "reason": {
+              "type": "string",
+              "description": "A razao que o juiz deu. So o runner escreve."
+            },
+            "scored": {
+              "type": "number",
+              "description": "O score que o juiz deu. So o runner escreve."
+            }
+          }
+        }
+      }
+    },
+    "scoreAssert": {
+      "title": "min_score",
+      "description": "O piso do CASO, sobre o score ponderado de todos os asserts dele. Sem esta linha o caso exige tudo (piso 1.0). Com ela, vale credito parcial. promptfoo `threshold` e `assert-set`.",
+      "type": "object",
+      "required": [
+        "min_score"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "min_score": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "happened": {
+          "$ref": "#/$defs/happened"
+        }
+      }
+    }
+  }
+}
