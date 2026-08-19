@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../expectagent.schema.json
+
+# A case right after the interview: what was asked is written, nothing has been
+# measured yet. There is no `---` and no runs below it, which is exactly the
+# state the splash screen exists for.
+
+- greets_by_name:
+  - user: "oi, aqui é a Ana"
+  - tool: crm.lookup
+    args: {name: Ana}
+    returns:
+      contains: Ana
+  - agent:
+      contains: {all: [Ana], none: ["como posso ajudar"]}
