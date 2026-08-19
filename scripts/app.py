@@ -26,6 +26,7 @@ from monsterui.all import (
     Details,
     DivCentered,
     DivFullySpaced,
+    DivLAligned,
     DivVStacked,
     H1,
     H3,
@@ -43,6 +44,7 @@ from monsterui.all import (
     Table,
     Tbody,
     Td,
+    TextPresets,
     Th,
 )
 
@@ -149,9 +151,50 @@ class App:
                 own words.
                 """
 
+                class Rules:
+                    """Atom — a structured turn, one rule per line.
+
+                    An assert like `tools:` carries nested dicts, and printing the
+                    value renders Python's own repr — braces, quotes and all. The
+                    person confirming this screen is being asked to agree with the
+                    RULE, so the rule is what has to be readable; a leaf becomes
+                    `path   value · value`, and the nesting becomes the path.
+                    """
+
+                    @staticmethod
+                    def leaves(value, path: str = "") -> list:
+                        """Walk to the leaves; a leaf is a list or a scalar."""
+                        if not isinstance(value, dict):
+                            items = value if isinstance(value, list) else [value]
+                            return [(path, " · ".join(str(i) for i in items))]
+                        return [
+                            leaf
+                            for key, inner in value.items()
+                            for leaf in App.EvalsTemplate.RunViewWidget.Turn.Rules.leaves(
+                                inner, f"{path} {key}".strip()
+                            )
+                        ]
+
+                    def __new__(cls, verb: str, value: dict) -> FT:
+                        return DivVStacked(
+                            *[
+                                DivLAligned(
+                                    Small(f"{verb} {path}", cls=TextPresets.muted_sm),
+                                    CodeSpan(text),
+                                    cls="gap-3 items-baseline",
+                                )
+                                for path, text in cls.leaves(value)
+                            ],
+                            cls="items-start gap-1",
+                        )
+
                 def __new__(cls, turn: dict) -> FT:
+                    verb = Eval.turn_verb(turn)
+                    value = turn[verb]
                     return LiStep(
-                        CodeSpan(f"{Eval.turn_verb(turn)}: {turn[Eval.turn_verb(turn)]}"),
+                        cls.Rules(verb, value)
+                        if isinstance(value, dict)
+                        else CodeSpan(f"{verb}: {value}"),
                         Small(f"happened: {turn['happened']}") if "happened" in turn else "",
                         cls=StepT.error if "happened" in turn else StepT.neutral,
                         data_content="✗" if "happened" in turn else None,
@@ -179,6 +222,12 @@ class App:
                 the shape came from outside, and outside shapes get a fallback.
                 """
 
+                # The reserved entry is SETTINGS, not a case: it declares the
+                # vocabulary and where the run goes. Rendered as a case it got the
+                # same weight as the behaviour being confirmed, which is the one
+                # thing on screen the person is actually agreeing to.
+                SETTINGS = "expectagent"
+
                 def __new__(cls, cases: list) -> FT:
                     return DivVStacked(
                         *[
@@ -187,10 +236,13 @@ class App:
                                 App.EvalsTemplate.RunViewWidget.Trace(turns)
                                 if isinstance(turns, list)
                                 else Small(str(turns)),
+                                cls="items-start gap-2 w-full",
                             )
                             for case in cases
                             for name, turns in case.items()
-                        ]
+                            if name != cls.SETTINGS
+                        ],
+                        cls="items-start gap-8 w-full",
                     )
 
             def __new__(cls, run: dict) -> FT:
@@ -292,8 +344,26 @@ class App:
         # `?run=` comes from the address bar, so it is clamped rather than trusted:
         # an out-of-range index would be an IndexError served as a 500.
         selected = min(max(selected, 0), len(runs) - 1) if runs else 0
+        # The vocabulary belongs in the shell, beside the file it describes: it is
+        # true of every case in the file, so repeating it inside one of them said
+        # it was that case's.
+        verbs = next(
+            (
+                entry[cls.EvalsTemplate.RunViewWidget.Cases.SETTINGS].get("verbs", [])
+                for entry in spec
+                if cls.EvalsTemplate.RunViewWidget.Cases.SETTINGS in entry
+            ),
+            [],
+        )
         return Container(
-            DivFullySpaced(H3(shared.EVAL_FILE.name), Subtitle(Eval.origin())),
+            DivFullySpaced(
+                DivLAligned(
+                    H3(shared.EVAL_FILE.name),
+                    Small(" · ".join(verbs), cls=TextPresets.muted_sm) if verbs else "",
+                    cls="gap-3 items-baseline",
+                ),
+                Subtitle(Eval.origin()),
+            ),
             cls.EvalsTemplate(runs, selected)
             if runs
             else (cls.ConfirmedTemplate(spec) if confirmed else cls.SplashTemplate(spec)),
