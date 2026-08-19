@@ -208,13 +208,14 @@ class View:
         import uvicorn
 
         sys.path.insert(0, str(Path(__file__).parent))
-        
-        # Set before importing `view`: `app` does `from core import EVAL_FILE`,
-        # which binds a copy at import time.
+
+        # `global`, not a local of the same name: `app.py` reads `shared.EVAL_FILE`
+        # by attribute, so a local assignment here would leave it None and render
+        # the "no file" screen for a file that was given.
+        global EVAL_FILE
         EVAL_FILE = eval_file
 
-        from view import app
-
+        config = uvicorn.Config(View.page(), port=port, host="127.0.0.1", log_level="warning")
         threading.Thread(target=uvicorn.Server(config).run, daemon=True).start()
 
         url = View.url(port)
