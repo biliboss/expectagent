@@ -55,7 +55,6 @@ O vocabulário inteiro em `my meta resources outline_notation`.
     🗃️ ConvexStore:
 
   🖥️ UI:
-    🖥️ TauriShell:
     📄 EvalTemplate:
       🧩 CaseWidget:
       🧩 RunViewWidget:
@@ -97,9 +96,10 @@ O vocabulário inteiro em `my meta resources outline_notation`.
   que deixa a tela rápida e compartilhável, e perder ele não corrompe nada — se
   divergir do arquivo, o arquivo ganha.
 - **`🖥️ UI`** — a interface de visualização dos testes, e é o produto: é ela que o
-  agente monta e a pessoa confirma. `TauriShell` é o app; dentro, `EvalTemplate` é a
-  tela, com `CaseWidget` mostrando o que se pediu, `RunViewWidget` a run aberta e
-  `RunsWidget` o histórico.
+  agente monta e a pessoa confirma. `EvalTemplate` é a tela, com `CaseWidget`
+  mostrando o que se pediu, `RunViewWidget` a run aberta e `RunsWidget` o
+  histórico. Ela é HTML servido em loopback e aberto no navegador — sem shell
+  desktop, que foi tentado com Tauri e removido em 19/08.
 - **`⚡ Background`** — `InngestJobs` roda o que não pode se perder no meio (uma
   suíte longa, um juiz caro), e `ProductionSampler` amostra produção, onde não
   existe resposta certa.
@@ -111,8 +111,11 @@ O vocabulário inteiro em `my meta resources outline_notation`.
 
 ## A stack, e a linha que ela não atravessa
 
-Tauri + Next.js + Convex + Inngest + HeroUI. É a stack da casa, e é com ela que a
-**interface de visualização dos testes** é construída.
+Next.js + Convex + Inngest + HeroUI. É a stack da casa, e é com ela que a
+**interface de visualização dos testes** será construída. O shell desktop saiu:
+Tauri foi tentado via `pytauri-wheel` e removido em 19/08 — ele travava o Python
+em cp39..cp313 e trazia um toolchain inteiro para renderizar HTML que o navegador
+já renderiza.
 
 E ela cria uma contradição que precisa ficar escrita, porque calada ela mata a
 única promessa que o produto tem: *zero infra é a feature*. Um app com backend,

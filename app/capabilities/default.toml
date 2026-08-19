@@ -1,7 +1,0 @@
-identifier = "default"
-description = "The main window. The minimum and nothing else: no fs, no shell, no http — the view renders what the local server sends, and that is all."
-windows = ["main"]
-permissions = [
-    "core:default",
-    "pytauri:default",
-]
