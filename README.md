@@ -45,9 +45,10 @@ right — and a run stops at the first divergence, writing what happened under t
 exact turn. Past runs are never rewritten; they are measurements.
 
 ```bash
-uv run scripts/cli.py view path/to/eval.yaml   # open it, for a human to confirm
-uv run scripts/cli.py run  path/to/eval.yaml   # execute it against its target
-uv run scripts/schema_check.py                # 11 accepted, 37 refused
+uv run scripts/cli.py view  path/to/eval.yaml   # open it, for a human to confirm
+uv run scripts/cli.py run   path/to/eval.yaml   # execute it against its target
+uv run scripts/cli.py check path/to/eval.yaml   # validate against the contract
+uv run scripts/cli.py check                     # prove the contract: 11 accepted, 37 refused
 ```
 
 No build step and nothing to install: the scripts carry their own dependencies
@@ -90,7 +91,7 @@ never / before / nth` for call order, and `budget` for time and cost. Reusing th
 existing name is the rule, not a courtesy — the origin of every one is a column in
 [`references/design.md`](references/design.md).
 
-The negative controls in `schema_check.py` are the half that matters. A schema with
+The negative controls behind `check` are the half that matters. A schema with
 only good examples becomes decoration the day someone loosens an
 `additionalProperties`, and the good example keeps passing. This is not
 hypothetical: the check that proves the schema refuses things was itself written as

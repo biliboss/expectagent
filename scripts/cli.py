@@ -1,6 +1,7 @@
 # /// script
 # requires-python = ">=3.12,<3.14"
 # dependencies = [
+#   "jsonschema",
 #   "python-fasthtml",
 #   "monsterui",
 #   "pyyaml",
@@ -11,9 +12,10 @@
 # ///
 """The command.
 
-    expectagent view path/to/eval.yaml    # open it, for a human to confirm
-    expectagent run  path/to/eval.yaml    # execute it against its target
-    expectagent      path/to/eval.yaml    # view is the default
+    expectagent view  path/to/eval.yaml   # open it, for a human to confirm
+    expectagent run   path/to/eval.yaml   # execute it against its target
+    expectagent check path/to/eval.yaml   # validate it against the contract
+    expectagent       path/to/eval.yaml   # view is the default
 
 One class, one method per verb — the Outline of this file IS the command surface,
 so a verb that exists is a verb you can see. The machinery lives in `shared.py`
@@ -23,14 +25,13 @@ and `runner.py`.
 import sys
 from pathlib import Path
 
-from runner import Run
-from shared import View
+from shared import Check, Run, View
 
 
 class ExpectAgent:
     """The verbs. Each takes the eval file and returns the process exit code."""
 
-    VERBS = ("view", "run")
+    VERBS = ("view", "run", "check")
 
     @staticmethod
     def view(file_source: Path | None) -> int:
@@ -48,6 +49,15 @@ class ExpectAgent:
         destination, held = Run(file_source).execute()
         print(f"{'PASS' if held else 'FAILED'} — {destination}", flush=True)
         return 0 if held else 1
+
+    @staticmethod
+    def check(file_source: Path | None) -> int:
+        """Validate a file against the contract. With no file, prove the contract."""
+        import json
+
+        if file_source is None:
+            return Check.selftest()
+        return 1 if Check.file(file_source, json.loads(Check.SCHEMA_FILE.read_text())) else 0
 
     @staticmethod
     def main(argv: list[str]) -> int:

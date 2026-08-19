@@ -13,8 +13,8 @@ reading a word.
 Reading the file, and the git behind it, lives in `core.py`.
 """
 
-import core
-from core import eval_read, origin, turn_verb
+import shared
+from shared import Eval
 from fasthtml.common import FT, Thead, Tr
 from monsterui.all import (
     Button,
@@ -151,7 +151,7 @@ class App:
 
                 def __new__(cls, turn: dict) -> FT:
                     return LiStep(
-                        CodeSpan(f"{turn_verb(turn)}: {turn[turn_verb(turn)]}"),
+                        CodeSpan(f"{Eval.turn_verb(turn)}: {turn[Eval.turn_verb(turn)]}"),
                         Small(f"happened: {turn['happened']}") if "happened" in turn else "",
                         cls=StepT.error if "happened" in turn else StepT.neutral,
                         data_content="✗" if "happened" in turn else None,
@@ -226,7 +226,7 @@ class App:
                 def __new__(cls, run: dict) -> str:
                     return next(
                         (
-                            f"{name} · {turn_verb(t)}: {t[turn_verb(t)]}"
+                            f"{name} · {Eval.turn_verb(t)}: {t[Eval.turn_verb(t)]}"
                             for case in run.get("cases", [])
                             for name, turns in case.items()
                             for t in (turns if isinstance(turns, list) else [])
@@ -288,19 +288,19 @@ class App:
         if file_source is None:
             return Container(cls.FileSourceNotSetTemplate(), id="eval-body")
 
-        spec, runs = eval_read(file_source)
+        spec, runs = Eval.read(file_source)
         # `?run=` comes from the address bar, so it is clamped rather than trusted:
         # an out-of-range index would be an IndexError served as a 500.
         selected = min(max(selected, 0), len(runs) - 1) if runs else 0
         return Container(
-            DivFullySpaced(H3(core.EVAL_FILE.name), Subtitle(origin())),
+            DivFullySpaced(H3(shared.EVAL_FILE.name), Subtitle(Eval.origin())),
             cls.EvalsTemplate(runs, selected)
             if runs
             else (cls.ConfirmedTemplate(spec) if confirmed else cls.SplashTemplate(spec)),
             # The raw file, collapsed: open it was forty lines of teaching
             # comments burying four lines of trace, and closed it is one click.
             Details(
-                Summary(Small(core.EVAL_FILE.name)),
+                Summary(Small(shared.EVAL_FILE.name)),
                 CodeBlock(file_source, code_cls="language-yaml"),
             ),
             id="eval-body",
