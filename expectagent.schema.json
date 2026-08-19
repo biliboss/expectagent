@@ -18,7 +18,14 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "$ref": "#/$defs/case"
+        "oneOf": [
+          {
+            "$ref": "#/$defs/settings"
+          },
+          {
+            "$ref": "#/$defs/case"
+          }
+        ]
       }
     },
     "runsDoc": {
@@ -126,6 +133,9 @@
         },
         {
           "$ref": "#/$defs/scoreAssert"
+        },
+        {
+          "$ref": "#/$defs/customVerbTurn"
         }
       ]
     },
@@ -819,6 +829,130 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1
+        },
+        "happened": {
+          "$ref": "#/$defs/happened"
+        }
+      }
+    },
+    "settings": {
+      "title": "expectagent",
+      "description": "A reserved first entry: how THIS file runs, so nothing about the host is baked into the tool. It is optional — a file without it uses the built-in verbs and whatever target the runner was pointed at.",
+      "type": "object",
+      "required": [
+        "expectagent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "expectagent": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "verbs": {
+              "description": "The tool vocabulary of THIS agent, usable as turn keys. `skill: playbook` then means the tool named `skill` called with `playbook`. Without this, a real agent's own words have to be spelled `tool: skill / args: {name: ...}`, which doubles the lines and reads worse than the thing it describes.",
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              }
+            },
+            "target": {
+              "description": "Where the run goes. Declared here so the same file runs anywhere.",
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "process",
+                    "http",
+                    "in_process"
+                  ]
+                },
+                "command": {
+                  "type": "string",
+                  "description": "kind=process: argv, receives the input on stdin."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "kind=http: the endpoint that answers a turn."
+                },
+                "callable": {
+                  "type": "string",
+                  "description": "kind=in_process: `module:function`."
+                },
+                "model": {
+                  "type": "string",
+                  "description": "Pinned when the target is a model."
+                }
+              }
+            },
+            "runs": {
+              "description": "Where runs are written. Default is this same file, below the `---`. A path sends them elsewhere — for a spec that is read-only, or shared.",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "customVerbTurn": {
+      "title": "custom verb",
+      "description": "A turn using a verb this file declared in `expectagent.verbs`. The value is what the tool was called with. Names are validated by the runner against the declaration, because JSON Schema cannot check one part of a document against another.",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 3,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "user"
+            ]
+          },
+          {
+            "required": [
+              "agent"
+            ]
+          },
+          {
+            "required": [
+              "tool"
+            ]
+          },
+          {
+            "required": [
+              "tools"
+            ]
+          },
+          {
+            "required": [
+              "budget"
+            ]
+          },
+          {
+            "required": [
+              "judge"
+            ]
+          },
+          {
+            "required": [
+              "min_score"
+            ]
+          }
+        ]
+      },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "properties": {
+        "input": {
+          "description": "What was passed along with it, when the name is not the whole call."
+        },
+        "returns": {
+          "$ref": "#/$defs/expected"
         },
         "happened": {
           "$ref": "#/$defs/happened"

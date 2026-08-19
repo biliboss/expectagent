@@ -34,6 +34,23 @@ One YAML per behaviour. Spec above the `---`, runs below it, newest first. Past 
 
 The position of a turn IS the assertion: a tool called out of order fails even when the final answer is right.
 
+**Write the case in the agent's own words, not in mine.** A reserved first entry declares the tool vocabulary, and then those words are turn keys:
+
+```yaml
+- expectagent:
+    verbs: [skill, resource, script]
+    target: {kind: process, command: "./my_agent --json"}
+    runs: runs/share_external.yaml
+
+- shares_external_link:
+  - user: "manda pro meu cliente http://..."
+  - skill: playbook
+  - script: whatsapp:send
+    input: "Peguei o link."
+```
+
+Without that declaration the same three lines have to be spelled `tool: skill` plus `args: {name: playbook}` — double the length, and worse to read than the thing being described. Nothing else about the host is baked in either: `target` says where the run goes (a process, an HTTP endpoint, a callable), and `runs` sends the results somewhere other than this same file, for a spec that is read-only or shared. All three are optional; a file without them uses the built-in verbs and whatever target the runner was pointed at.
+
 Point the file at the contract and the editor validates as you type:
 
 ```yaml

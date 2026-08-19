@@ -143,6 +143,28 @@ SIMILAR_E_FORMATO = """
       similar: {to: "apartamento de 3 quartos", method: rouge_l, min: 0.6}
 """
 
+
+# O vocabulário do próprio agente como verbo de turno, e onde o run roda.
+# Vem do caso real em galgal/components/evals/share_external.
+VERBOS_PROPRIOS = """
+- expectagent:
+    verbs: [skill, resource, script]
+    target: {kind: process, command: "./meu_agente --json"}
+    runs: runs/share_external.yaml
+
+- share_external_main:
+  - user: manda pro meu cliente http://exemplo/imovel/1
+  - skill: playbook
+  - resource: playbook:how_to_route
+  - script: whatsapp:send
+    input: Peguei o link.
+  - tools:
+      only: [skill, resource, script]
+      never: [criar_link_direto]
+  - agent:
+      contains: {all: [link], none: [5 minutos]}
+"""
+
 BONS = {
     "um turno": UM_TURNO,
     "multiturno": MULTITURNO,
@@ -154,6 +176,7 @@ BONS = {
     "combinadores": COMBINADORES,
     "juiz com trela": JUIZ,
     "similar e formato": SIMILAR_E_FORMATO,
+    "verbos proprios": VERBOS_PROPRIOS,
 }
 
 RUINS = {
@@ -226,6 +249,20 @@ RUINS = {
         "- x:\n  - user: ping\n  - agent: {not_contains: pong}\n"
     ),
     "peso zero": "- x:\n  - user: ping\n  - agent: {equals: pong, weight: 0}\n",
+    "settings com chave inventada": (
+        "- expectagent: {verbos: [skill]}\n- x:\n  - user: ping\n  - agent: pong\n"
+    ),
+    "verbo custom com maiuscula": (
+        "- expectagent: {verbs: [Skill]}\n- x:\n  - user: ping\n  - agent: pong\n"
+    ),
+    "target sem kind": (
+        "- expectagent: {target: {url: http://x}}\n- x:\n  - user: ping\n  - agent: pong\n"
+    ),
+    "target com kind inventado": (
+        "- expectagent: {target: {kind: carrier_pigeon}}\n- x:\n  - user: ping\n  - agent: pong\n"
+    ),
+    "settings vazio": "- expectagent: {}\n- x:\n  - user: ping\n  - agent: pong\n",
+    "verbs vazio": "- expectagent: {verbs: []}\n- x:\n  - user: ping\n  - agent: pong\n",
 }
 
 
