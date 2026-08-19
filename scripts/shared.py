@@ -1,6 +1,6 @@
 """Serving the view on loopback, and the window that shows it.
 
-Lives apart from `expectagent.py` so that entry point stays one verb. Everything
+Lives apart from `cli.py` so the command surface stays just its verbs. Everything
 here is machinery — the kind of thing you read once and then trust.
 """
 
@@ -85,7 +85,7 @@ class View:
                 return
             except (URLError, OSError):
                 threading.Event().wait(0.1)
-        raise SystemExit(f"the view never answered at {url} — run scripts/view.py to see why")
+        raise SystemExit(f"the view never answered at {url} — run it again with the server in the foreground to see why")
 
     @staticmethod
     def resolve(argv: list[str]) -> Path | None:

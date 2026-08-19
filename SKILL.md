@@ -7,9 +7,9 @@ Write the expected behaviour before the agent exists, get a human to confirm it,
 
 Interview first, and ask only what you are below 95% sure about — one question per round, with options when options exist, and your recommendation stated. Facts are your job: read the repo, the prompt, the tool list. Decisions are the person's. Write each answer into the eval file as it arrives, never at the end.
 
-Then show it and get a yes. Run `uv run scripts/view.py` and let them read the case. They confirm, or they fix one line. Never leave a case they have not seen.
+Then show it and get a yes. Run `uv run scripts/cli.py view <file>` and let them read the case. They confirm, or they fix one line. Never leave a case they have not seen.
 
-Only then build the agent, or point at one that exists. Run it with `uv run scripts/run.py`. It stops at the first turn that diverges and writes what actually happened under that turn.
+Only then build the agent, or point at one that exists. Run it with `uv run scripts/cli.py run <file>`. It stops at the first turn that diverges and writes what actually happened under that turn.
 
 **A case that passes on its first run is suspect.** It either describes what the agent already did, or the worry behind it was not real. Say which, then tighten the assert or record that the worry does not hold. Never post-process the agent's reply to turn a run green.
 

@@ -45,9 +45,9 @@ right — and a run stops at the first divergence, writing what happened under t
 exact turn. Past runs are never rewritten; they are measurements.
 
 ```bash
-uv run scripts/expectagent.py path/to/eval.yaml   # open it in the browser
-uv run scripts/run.py                             # run the cases, append the run
-uv run scripts/schema_check.py                    # 10 accepted, 31 refused
+uv run scripts/cli.py view path/to/eval.yaml   # open it, for a human to confirm
+uv run scripts/cli.py run  path/to/eval.yaml   # execute it against its target
+uv run scripts/schema_check.py                # 11 accepted, 37 refused
 ```
 
 No build step and nothing to install: the scripts carry their own dependencies
@@ -55,7 +55,7 @@ No build step and nothing to install: the scripts carry their own dependencies
 the whole story:
 
 ```bash
-alias expectagent='uv run ~/src/expectagent/scripts/expectagent.py'
+alias expectagent='uv run ~/src/expectagent/scripts/cli.py'
 ```
 
 ## The judge is on a leash
@@ -106,9 +106,10 @@ candidate first slices are in
 and what is deliberately out of scope is in
 [`references/design.md`](references/design.md).
 
-`scripts/run.py` currently talks to one provider (Kimi k3, key read from
-`~/kimi_token` at call time). The adapter boundary is designed for in-process, HTTP
-and subprocess targets; only the first exists.
+The runner speaks one contract — a target takes a message and returns
+`{"reply", "calls"}` — and `process`, `http` and `in_process` targets are all
+implemented. What is NOT: `judge`, `budget` and `min_score` are in the schema and
+raise in the runner rather than passing quietly.
 
 Design docs are in Portuguese. Code, schema and this README are in English.
 

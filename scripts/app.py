@@ -105,7 +105,7 @@ class App:
                     H1("confirmado"),
                     Subtitle("agora o agente pode ser construído contra isto"),
                 ),
-                footer=Small(CodeSpan("uv run scripts/run.py")),
+                footer=Small(CodeSpan("expectagent run")),
             )
 
     class FileSourceNotSetTemplate:
@@ -120,9 +120,9 @@ class App:
             return Card(
                 DivVStacked(
                     Subtitle("aponte para um arquivo de eval:"),
-                    CodeSpan("uv run scripts/expectagent.py caminho/do/eval.yaml"),
+                    CodeSpan("expectagent view caminho/do/eval.yaml"),
                     Small("ou comece pelo exemplo:"),
-                    CodeSpan("uv run scripts/expectagent.py examples/ping_pong.yaml"),
+                    CodeSpan("expectagent view examples/ping_pong.yaml"),
                 ),
                 header=DivCentered(
                     H1("nenhum arquivo"),
