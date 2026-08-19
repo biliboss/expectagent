@@ -1,0 +1,22 @@
+# The Expect Agent window. `frontendDist` is rewritten at runtime by
+# expectagent.py to point at the local server — the same mechanism pytauri's dev
+# mode uses, and what lets the view stay our HTML instead of a bundle.
+"$schema" = "https://schema.tauri.app/config/2"
+productName = "Expect Agent"
+version = "0.1.0"
+identifier = "dev.expectagent.app"
+
+[build]
+frontendDist = "./placeholder"
+
+[app]
+withGlobalTauri = false
+
+[[app.windows]]
+label = "main"
+title = "Expect Agent"
+width = 1100
+height = 800
+
+[bundle]
+icon = ["icons/icon.png"]
