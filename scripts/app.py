@@ -17,6 +17,8 @@ import core
 from core import eval_read, origin, turn_verb
 from fasthtml.common import FT, Thead, Tr
 from monsterui.all import (
+    Button,
+    ButtonT,
     Card,
     CodeBlock,
     CodeSpan,
@@ -57,12 +59,51 @@ class App:
         here would read as "broken" when it means "not measured yet".
         """
 
+        class Confirm:
+            """The yes, and the keystroke that gives it.
+
+            The shortcut is bound on `body`, not on the button, so it works wherever
+            the eye happens to be — a confirmation you have to click into first is a
+            confirmation people click without reading.
+            """
+
+            def __new__(cls) -> FT:
+                return DivFullySpaced(
+                    Small("nada é construído antes daqui"),
+                    Button(
+                        "confirmar",
+                        Small(" ⌘⏎"),
+                        cls=ButtonT.primary,
+                        hx_post="/confirm",
+                        hx_target="#eval-body",
+                        hx_swap="outerHTML",
+                        hx_trigger="click, keydown[(metaKey||ctrlKey)&&key==\'Enter\'] from:body",
+                    ),
+                )
+
         def __new__(cls, spec: list) -> FT:
             return Card(
                 App.EvalsTemplate.RunViewWidget.Cases(spec),
                 header=DivCentered(
-                    H1("nenhuma run ainda"),
-                    Subtitle("o que se pediu está escrito; o que aconteceu, não"),
+                    H1("é isso que ele tem que fazer?"),
+                    Subtitle("confirme, e o agente é construído contra isto"),
+                ),
+                footer=cls.Confirm(),
+            )
+
+    class ConfirmedTemplate:
+        """After the yes: what was agreed, and that the window is done.
+
+        It repeats the cases instead of collapsing to a checkmark, because the
+        last thing on screen should be the thing that was agreed to.
+        """
+
+        def __new__(cls, spec: list) -> FT:
+            return Card(
+                App.EvalsTemplate.RunViewWidget.Cases(spec),
+                header=DivCentered(
+                    H1("confirmado"),
+                    Subtitle("agora o agente pode ser construído contra isto"),
                 ),
                 footer=Small(CodeSpan("uv run scripts/run.py")),
             )
@@ -233,11 +274,11 @@ class App:
                 cls.RunsWidget(runs, runs[selected]),
             )
 
-    def __new__(cls, file_source: str | None, selected: int = 0) -> FT:
+    def __new__(cls, file_source: str | None, selected: int = 0, confirmed: bool = False) -> FT:
         """Pick the screen the state deserves, and wrap it in the shell.
 
-        Three states, and each has a screen: no file, a file with no runs, and a
-        file with runs. The shell — the name, the origin, the raw source — only
+        Four states, and each has a screen: no file, a file with no runs, that
+        same file once someone confirmed it, and a file with runs. The shell — the name, the origin, the raw source — only
         makes sense once a file exists, so the first state renders bare.
 
         The whole body carries the htmx id, so selecting a run swaps the view AND
@@ -253,7 +294,9 @@ class App:
         selected = min(max(selected, 0), len(runs) - 1) if runs else 0
         return Container(
             DivFullySpaced(H3(core.EVAL_FILE.name), Subtitle(origin())),
-            cls.EvalsTemplate(runs, selected) if runs else cls.SplashTemplate(spec),
+            cls.EvalsTemplate(runs, selected)
+            if runs
+            else (cls.ConfirmedTemplate(spec) if confirmed else cls.SplashTemplate(spec)),
             # The raw file, collapsed: open it was forty lines of teaching
             # comments burying four lines of trace, and closed it is one click.
             Details(

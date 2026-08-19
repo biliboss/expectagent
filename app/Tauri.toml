@@ -1,0 +1,18 @@
+# The Expect Agent shell. `frontendDist` is never used: the window is built in
+# code with an EXTERNAL url pointing at the local server, so the view stays our
+# HTML instead of a bundle. The key stays because the config schema wants it.
+#
+# There is deliberately no `[[app.windows]]` here. Tauri creates config windows
+# during run(), not build(), so a window declared here would collide with the one
+# built in shared.py — "a webview with label `main` already exists", measured.
+# The window is built in code because only the running app can measure the monitor.
+"$schema" = "https://schema.tauri.app/config/2"
+productName = "Expect Agent"
+version = "0.1.0"
+identifier = "dev.expectagent.app"
+
+[build]
+frontendDist = "./placeholder"
+
+[app]
+withGlobalTauri = false

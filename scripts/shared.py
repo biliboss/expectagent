@@ -1,4 +1,4 @@
-"""Serving the view on loopback: the port, the server, the URL, the browser.
+"""Serving the view on loopback, and the window that shows it.
 
 Lives apart from `expectagent.py` so that entry point stays one verb. Everything
 here is machinery — the kind of thing you read once and then trust.
@@ -13,6 +13,34 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class Confirm:
+    """The person's yes, and what it is worth: the exit code the caller reads.
+
+    APPROVED means someone looked at the screen and said so. Closing the window
+    without confirming exits DISMISSED, so an agent that opened this can tell
+    approval from walking away — silence is not consent, and the whole product
+    rests on a human having actually looked.
+    """
+
+    APPROVED = 0
+    DISMISSED = 2
+
+    decided = threading.Event()
+    app_handle = None  # set by Window.open; None on the browser path
+
+    @staticmethod
+    def approve() -> None:
+        """Record the yes and end the session. Called by the `/confirm` route.
+
+        The exit is deferred a beat so the response reaches the screen first —
+        killing the app mid-response would leave the person staring at a dead
+        window wondering whether it took.
+        """
+        Confirm.decided.set()
+        if Confirm.app_handle is not None:
+            threading.Timer(0.4, lambda: Confirm.app_handle.exit(Confirm.APPROVED)).start()
 
 
 class View:
@@ -77,14 +105,19 @@ class View:
 
     @staticmethod
     def show(eval_file: Path | None) -> int:
-        """Serve it, open it, and stay up until Ctrl-C.
+        """Serve it, open it, and stay up until it closes.
 
-        The three steps never happen apart, so they are one call — the entry point
-        should not have to know a port exists.
+        The steps never happen apart, so they are one call — the entry point should
+        not have to know a port exists. The window is the default; the browser is
+        what is left when there is no native wheel for this Python.
         """
         port = View.free_port()
         View.serve(eval_file, port)
-        return View.open(port)
+        try:
+            return Window.open(port)
+        except ImportError as missing:
+            print(f"window unavailable ({missing}); falling back to the browser", file=sys.stderr)
+            return View.open(port)
 
     @staticmethod
     def url(port: int) -> str:
@@ -94,7 +127,80 @@ class View:
     def open(port: int) -> int:
         """Hand the URL to the browser and stay up until Ctrl-C."""
         url = View.url(port)
-        print(f"the view is at {url} — Ctrl-C to stop")
+        print(f"the view is at {url} — ⌘⏎ to confirm, Ctrl-C to stop", flush=True)
         webbrowser.open(url)
-        threading.Event().wait()  # the daemon server dies with this process
-        return 0
+        Confirm.decided.wait()  # the daemon server dies with this process
+        return Confirm.APPROVED
+
+
+class Window:
+    """The desktop window: Tauri through `pytauri-wheel`, no Rust toolchain.
+
+    The window is built in Python, not declared in `Tauri.toml` — pytauri does not
+    create config windows at build time, so `[[app.windows]]` produced an app with
+    zero windows and `get_webview_window` returned None. Measured, not assumed.
+
+    It renders the same loopback URL the browser would, and registers no commands:
+    every piece of state lives in the file, and the runner is what writes it.
+    """
+
+    MONITOR = 0
+
+    @staticmethod
+    def place(window) -> None:
+        """Maximize on monitor 0 — the work area, not the whole glass.
+
+        Order matters and is the only reason this is not one line: `maximize()`
+        fills whatever monitor the window is currently on, so the window has to be
+        MOVED to monitor 0 first. Maximizing first and moving after would drag a
+        maximized window across monitors, which is not the same thing.
+
+        Maximized rather than fullscreen: fullscreen takes over the desktop and
+        hides the menu bar, and this is a window someone reads next to their
+        editor, not a presentation.
+        """
+        monitors = window.available_monitors()
+        monitor = monitors[Window.MONITOR] if len(monitors) > Window.MONITOR else monitors[0]
+        origin_x, origin_y = monitor.position
+
+        from pytauri import Position
+
+        window.set_position(Position.Physical((origin_x, origin_y)))
+        window.maximize()
+
+    @staticmethod
+    def open(port: int) -> int:
+        """Build it hidden, measure the monitor, place it, then show. Returns the exit code.
+
+        Hidden first because placing it needs a window to ask about monitors, and a
+        visible one would flash at the default size on the wrong monitor and jump.
+        """
+        from anyio.from_thread import start_blocking_portal
+        from pytauri import Commands, WebviewUrl
+        from pytauri.webview import WebviewWindowBuilder
+        from pytauri_wheel.lib import builder_factory, context_factory
+
+        with start_blocking_portal("asyncio") as portal:
+            app = builder_factory().build(
+                context=context_factory(ROOT / "app"),
+                invoke_handler=Commands().generate_handler(portal),
+            )
+            window = WebviewWindowBuilder.build(
+                app,
+                "main",
+                WebviewUrl.External(View.url(port)),
+                title="Expect Agent",
+                visible=False,
+            )
+
+            Window.place(window)
+            print(
+                f"window maximized on monitor {Window.MONITOR}",
+                flush=True,  # stdout is a pipe here, and a buffered line reads as a hang
+            )
+            Confirm.app_handle = app
+            window.show()
+            app.run_return()
+            # Tauri exits 0 whether someone confirmed or just closed the window,
+            # so the answer comes from the flag and not from its exit code.
+            return Confirm.APPROVED if Confirm.decided.is_set() else Confirm.DISMISSED

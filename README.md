@@ -14,6 +14,12 @@ skill — clone it into your agent's skills folder and it starts using it.
 git clone https://github.com/biliboss/expectagent ~/.claude/skills/expectagent
 ```
 
+Already cloned somewhere? Symlink it instead, and the skill tracks the repo:
+
+```bash
+ln -s ~/src/expectagent ~/.claude/skills/expectagent
+```
+
 ## One file per behaviour
 
 ```yaml

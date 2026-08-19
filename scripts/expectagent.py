@@ -1,8 +1,15 @@
 # /// script
-# requires-python = ">=3.12"
-# dependencies = ["python-fasthtml", "monsterui", "pyyaml", "uvicorn"]
+# requires-python = ">=3.12,<3.14"
+# dependencies = [
+#   "python-fasthtml",
+#   "monsterui",
+#   "pyyaml",
+#   "uvicorn",
+#   "pytauri==0.8.*",
+#   "pytauri-wheel==0.8.*",
+# ]
 # ///
-"""Open Expect Agent in a browser.
+"""Open Expect Agent in a window.
 
     uv run scripts/expectagent.py path/to/eval.yaml
     uv run scripts/expectagent.py                       # asks which file, on screen

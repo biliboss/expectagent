@@ -19,6 +19,7 @@ import sys
 
 from core import eval_open, selftest
 from app import App
+from shared import Confirm
 from fasthtml.common import fast_app, serve
 from monsterui.all import Theme
 
@@ -34,6 +35,15 @@ app = fast_app(hdrs=Theme.slate.headers(), pico=False)[0]
 @app.get("/")
 def index(run: int = 0):
     return App(eval_open(), run)
+
+
+# The one thing this screen can change in the world. It ends the session with
+# APPROVED, so whoever opened the window learns a human actually said yes —
+# closing it instead exits DISMISSED, and silence never counts as consent.
+@app.post("/confirm")
+def confirm():
+    Confirm.approve()
+    return App(eval_open(), confirmed=True)
 
 if "--selftest" in sys.argv:
     selftest()
