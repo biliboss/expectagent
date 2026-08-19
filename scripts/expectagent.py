@@ -7,19 +7,20 @@
     uv run scripts/expectagent.py                       # the eval in examples/
     uv run scripts/expectagent.py path/to/eval.yaml
 
-One verb, one name. The machinery it calls lives in `shared.py`.
+One verb, one name. The machinery it calls lives in `shared.py`, and the argument
+parsing happens at the boundary below — so this takes a file, not a command line.
 """
 
 import sys
+from pathlib import Path
 
 from shared import View
 
 
-def expectagent(argv: list[str]) -> int:
+def expectagent(file_source: Path) -> int:
     """Serve the eval file on loopback and hand it to the browser."""
-    file_source = View.resolve(argv)
     return View.show(file_source)
 
 
 if __name__ == "__main__":
-    raise SystemExit(expectagent(sys.argv[1:]))
+    raise SystemExit(expectagent(View.resolve(sys.argv[1:])))
