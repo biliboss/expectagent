@@ -13,7 +13,6 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_EVAL = ROOT / "examples" / "ping_pong.yaml"
 
 
 class View:
@@ -31,7 +30,7 @@ class View:
             return sock.getsockname()[1]
 
     @staticmethod
-    def serve(eval_file: Path, port: int) -> None:
+    def serve(eval_file: Path | None, port: int) -> None:
         """Start the server on a daemon thread; return once it answers.
 
         Daemon, so Ctrl-C ends the process with nobody to join. It binds loopback
@@ -61,16 +60,23 @@ class View:
         raise SystemExit(f"the view never answered at {url} — run scripts/view.py to see why")
 
     @staticmethod
-    def resolve(argv: list[str]) -> Path:
-        """Which eval file the command was pointed at. Raises when it is not there."""
+    def resolve(argv: list[str]) -> Path | None:
+        """Which eval file the command was pointed at, or None when it was not.
+
+        None is a state the app renders, not an error: opening a default example
+        would put someone else's data on screen and let them mistake it for theirs.
+        A path that was given and does not exist IS an error, and says so.
+        """
         named = [arg for arg in argv if not arg.startswith("-")]
-        chosen = Path(named[0]).resolve() if named else DEFAULT_EVAL
+        if not named:
+            return None
+        chosen = Path(named[0]).resolve()
         if not chosen.is_file():
             raise SystemExit(f"no such file: {chosen}")
         return chosen
 
     @staticmethod
-    def show(eval_file: Path) -> int:
+    def show(eval_file: Path | None) -> int:
         """Serve it, open it, and stay up until Ctrl-C.
 
         The three steps never happen apart, so they are one call — the entry point

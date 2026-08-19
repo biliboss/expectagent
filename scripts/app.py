@@ -13,7 +13,8 @@ reading a word.
 Reading the file, and the git behind it, lives in `core.py`.
 """
 
-from core import EVAL_FILE, eval_read, origin, turn_verb
+import core
+from core import eval_read, origin, turn_verb
 from fasthtml.common import FT, Thead, Tr
 from monsterui.all import (
     Card,
@@ -64,6 +65,28 @@ class App:
                     Subtitle("o que se pediu está escrito; o que aconteceu, não"),
                 ),
                 footer=Small(CodeSpan("uv run scripts/run.py")),
+            )
+
+    class FileSourceNotSetTemplate:
+        """No file was pointed at, so there is nothing to show and nothing to guess.
+
+        Opening a default example here would put someone else's data on screen and
+        let them mistake it for their own — the worst failure a tool about trusting
+        output can have. So it asks, and shows the shape of the answer.
+        """
+
+        def __new__(cls) -> FT:
+            return Card(
+                DivVStacked(
+                    Subtitle("aponte para um arquivo de eval:"),
+                    CodeSpan("uv run scripts/expectagent.py caminho/do/eval.yaml"),
+                    Small("ou comece pelo exemplo:"),
+                    CodeSpan("uv run scripts/expectagent.py examples/ping_pong.yaml"),
+                ),
+                header=DivCentered(
+                    H1("nenhum arquivo"),
+                    Subtitle("o comando rodou sem dizer o que abrir"),
+                ),
             )
 
     class EvalsTemplate:
@@ -210,24 +233,31 @@ class App:
                 cls.RunsWidget(runs, runs[selected]),
             )
 
-    def __new__(cls, file_source: str, selected: int = 0) -> FT:
+    def __new__(cls, file_source: str | None, selected: int = 0) -> FT:
         """Pick the screen the state deserves, and wrap it in the shell.
+
+        Three states, and each has a screen: no file, a file with no runs, and a
+        file with runs. The shell — the name, the origin, the raw source — only
+        makes sense once a file exists, so the first state renders bare.
 
         The whole body carries the htmx id, so selecting a run swaps the view AND
         the list in one exchange — two targets would let the selection drift out
         of step with what is on screen.
         """
+        if file_source is None:
+            return Container(cls.FileSourceNotSetTemplate(), id="eval-body")
+
         spec, runs = eval_read(file_source)
         # `?run=` comes from the address bar, so it is clamped rather than trusted:
         # an out-of-range index would be an IndexError served as a 500.
         selected = min(max(selected, 0), len(runs) - 1) if runs else 0
         return Container(
-            DivFullySpaced(H3(EVAL_FILE.name), Subtitle(origin())),
+            DivFullySpaced(H3(core.EVAL_FILE.name), Subtitle(origin())),
             cls.EvalsTemplate(runs, selected) if runs else cls.SplashTemplate(spec),
             # The raw file, collapsed: open it was forty lines of teaching
             # comments burying four lines of trace, and closed it is one click.
             Details(
-                Summary(Small(EVAL_FILE.name)),
+                Summary(Small(core.EVAL_FILE.name)),
                 CodeBlock(file_source, code_cls="language-yaml"),
             ),
             id="eval-body",

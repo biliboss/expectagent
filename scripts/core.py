@@ -13,7 +13,10 @@ from pathlib import Path
 
 import yaml
 
-EVAL_FILE = Path(__file__).resolve().parents[1] / "examples" / "ping_pong.yaml"
+# No file until someone points at one. `shared.View.serve` sets it, and the app
+# renders the "not set" screen while it is None — a default here would open an
+# example nobody asked for and call it their data.
+EVAL_FILE: Path | None = None
 
 
 def _git(anchor: Path, *args: str) -> str:
@@ -32,18 +35,23 @@ def show(path: Path, ref: str = "HEAD") -> str:
     return _git(path.parent, "show", f"{ref}:{path.resolve().relative_to(root)}")
 
 
-def origin(anchor: Path = EVAL_FILE, ref: str = "HEAD") -> str:
+def origin(anchor: Path | None = None, ref: str = "HEAD") -> str:
     """Which branch and commit the content came from, e.g. `main @ a1a146ed9`."""
+    anchor = anchor or EVAL_FILE
+    if anchor is None:
+        return ""
     branch = _git(anchor.parent if anchor.is_file() else anchor, "rev-parse", "--abbrev-ref", ref)
     return f"{branch} @ {_git(anchor.parent if anchor.is_file() else anchor, 'rev-parse', '--short', ref)}"
 
 
-def eval_open() -> str:
+def eval_open() -> str | None:
     """o eval as of HEAD, never from the working tree.
 
     When the file is not in that commit this returns git's own words about it, so
     the page shows what is missing instead of quietly falling back to the tree.
     """
+    if EVAL_FILE is None:
+        return None
     try:
         return show(EVAL_FILE)
     except FileNotFoundError as e:

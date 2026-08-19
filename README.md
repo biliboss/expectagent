@@ -39,9 +39,17 @@ right — and a run stops at the first divergence, writing what happened under t
 exact turn. Past runs are never rewritten; they are measurements.
 
 ```bash
-uv run scripts/run.py             # run the cases, append the run
-uv run scripts/view.py            # the view: what was asked, where it broke
-uv run scripts/schema_check.py    # 10 documents accepted, 31 refused
+uv run scripts/expectagent.py path/to/eval.yaml   # open it in the browser
+uv run scripts/run.py                             # run the cases, append the run
+uv run scripts/schema_check.py                    # 10 accepted, 31 refused
+```
+
+No build step and nothing to install: the scripts carry their own dependencies
+(PEP 723), so `uv` fetches them on first run. For a global command, an alias is
+the whole story:
+
+```bash
+alias expectagent='uv run ~/src/expectagent/scripts/expectagent.py'
 ```
 
 ## The judge is on a leash
