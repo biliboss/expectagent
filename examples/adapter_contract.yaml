@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../expectagent.schema.json
+
+# The runner proven against a real process target, with a stand-in agent so the
+# three outcomes that matter can be shown side by side: a case that holds, one
+# that breaks on ORDER while answering correctly, and one that breaks on what the
+# reply is allowed to say.
+
+- expectagent:
+    target:
+      kind: process
+      command: "uv run --quiet examples/fake_agent.py"
+
+- looks_up_before_answering:
+  - user: ping
+  - tool: knowledge.search
+    args: {name: ping}
+  - agent:
+      contains: {all: [pong], none: ["🏓"]}
+
+- order_is_the_assertion:
+  - user: ping out of order
+  - tool: knowledge.search
+    args: {name: ping}
+  - agent: pong
+
+- reply_may_not_promise:
+  - user: ping with flourish
+  - tool: knowledge.search
+    args: {name: ping}
+  - agent:
+      contains: {none: ["🏓"]}

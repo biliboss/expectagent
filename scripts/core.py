@@ -58,6 +58,20 @@ def eval_open() -> str | None:
         return str(e)
 
 
+def runs_of(eval_file: Path) -> list:
+    """The runs for this eval: `output/<name>.runs.yaml` beside it.
+
+    Falls back to the second document inside the file, because that is where runs
+    used to live and those files are still real. A run is a measurement, so the
+    older shape gets read rather than migrated.
+    """
+    beside = eval_file.parent / "output" / f"{eval_file.stem}.runs.yaml"
+    if beside.is_file():
+        return yaml.safe_load(beside.read_text()) or []
+    documents = [d or [] for d in yaml.safe_load_all(eval_file.read_text())]
+    return documents[1] if len(documents) > 1 else []
+
+
 def eval_read(file_source: str) -> tuple[list, list]:
     """The file's two yaml documents: the spec, and the runs newest first.
 
@@ -65,7 +79,12 @@ def eval_read(file_source: str) -> tuple[list, list]:
     forty lines of them were burying the four lines of trace.
     """
     docs = [d or [] for d in yaml.safe_load_all(file_source)]
-    return (docs[0] if docs else [], docs[1] if len(docs) > 1 else [])
+    spec = docs[0] if docs else []
+    inside = docs[1] if len(docs) > 1 else []
+    beside = runs_of(EVAL_FILE) if EVAL_FILE is not None else []
+    # `output/` wins when it exists: it is where the runner writes now, and a
+    # stale second document would show an older verdict as if it were current.
+    return spec, (beside or inside)
 
 
 def turn_verb(turn: dict) -> str:
