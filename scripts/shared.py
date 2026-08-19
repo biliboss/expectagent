@@ -42,7 +42,7 @@ class View:
         sys.path.insert(0, str(Path(__file__).parent))
         import core
 
-        # Set before importing `view`: `template` does `from core import EVAL_FILE`,
+        # Set before importing `view`: `app` does `from core import EVAL_FILE`,
         # which binds a copy at import time.
         core.EVAL_FILE = eval_file
 

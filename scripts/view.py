@@ -18,7 +18,7 @@ grey and a divergence is the only coloured thing on it.
 import sys
 
 from core import eval_open, selftest
-from template import EvalsTemplate
+from app import App
 from fasthtml.common import fast_app, serve
 from monsterui.all import Theme
 
@@ -33,7 +33,7 @@ app = fast_app(hdrs=Theme.slate.headers(), pico=False)[0]
 # the click silently does nothing.
 @app.get("/")
 def index(run: int = 0):
-    return EvalsTemplate(eval_open(), run)
+    return App(eval_open(), run)
 
 if "--selftest" in sys.argv:
     selftest()
