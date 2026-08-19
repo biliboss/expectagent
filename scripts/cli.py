@@ -3,7 +3,6 @@
 # dependencies = [
 #   "jsonschema",
 #   "python-fasthtml",
-#   "monsterui",
 #   "pyyaml",
 #   "uvicorn",
 #   "pytauri==0.8.*",
