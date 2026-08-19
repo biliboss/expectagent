@@ -27,7 +27,7 @@ from pathlib import Path
 import yaml
 
 HERE = Path(__file__).parent
-EVAL = Path(__file__).resolve().parents[2] / "examples" / "ping_pong.yaml"
+EVAL = Path(__file__).resolve().parents[1] / "examples" / "ping_pong.yaml"
 SKILLS = HERE / "skills"
 API = "https://api.kimi.com/coding/v1/chat/completions"
 MODEL = "k3"

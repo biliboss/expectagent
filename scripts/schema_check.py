@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 from jsonschema import Draft202012Validator
 
-SCHEMA = json.loads((Path(__file__).parent / "expectagent.schema.json").read_text())
+SCHEMA = json.loads((Path(__file__).parent.parent / "expectagent.schema.json").read_text())
 
 # Um turno: entra isso, sai aquilo. A forma mais curta que o formato tem.
 UM_TURNO = """
@@ -230,7 +230,7 @@ RUINS = {
 
 
 def check_doc_table() -> None:
-    """Toda primitiva citada na tabela do docs/design.md existe no schema.
+    """Toda primitiva citada na tabela do references/design.md existe no schema.
 
     Sem isto, a tabela vira folheto: ela promete `tools.after`, ninguem roda nada,
     e o primeiro usuario descobre que o campo nunca existiu. Linha ~~riscada~~ e
@@ -247,7 +247,7 @@ def check_doc_table() -> None:
         | set(d["toolTurn"]["properties"])
     )
 
-    table = (Path(__file__).parent / "docs" / "design.md").read_text()
+    table = (Path(__file__).parent.parent / "references" / "design.md").read_text()
     table = table.split("## O contrato de asserts")[1].split("\n## ")[0]
 
     promised: set[str] = set()

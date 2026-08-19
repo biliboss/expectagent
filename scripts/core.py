@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-EVAL_FILE = Path(__file__).resolve().parents[2] / "examples" / "ping_pong.yaml"
+EVAL_FILE = Path(__file__).resolve().parents[1] / "examples" / "ping_pong.yaml"
 
 
 def _git(anchor: Path, *args: str) -> str:

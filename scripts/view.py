@@ -18,7 +18,7 @@ grey and a divergence is the only coloured thing on it.
 import sys
 
 from core import eval_open, selftest
-from evals_template import EvalsTemplate
+from template import EvalsTemplate
 from fasthtml.common import fast_app, serve
 from monsterui.all import Theme
 
