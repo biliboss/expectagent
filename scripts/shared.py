@@ -68,8 +68,16 @@ class Eval:
         anchor = anchor or EVAL_FILE
         if anchor is None:
             return ""
-        branch = Eval._git(anchor.parent if anchor.is_file() else anchor, "rev-parse", "--abbrev-ref", ref)
-        return f"{branch} @ {Eval._git(anchor.parent if anchor.is_file() else anchor, 'rev-parse', '--short', ref)}"
+        where = anchor.parent if anchor.is_file() else anchor
+        # An eval outside a repo is a normal thing to open — a scratch file, a case
+        # someone was handed. `_git` raising is right for `show`, where an
+        # uncommitted spec would be a lie about what ran; here it is only the
+        # provenance line, and it took the whole screen down with a 500.
+        try:
+            branch = Eval._git(where, "rev-parse", "--abbrev-ref", ref)
+        except FileNotFoundError:
+            return "fora de um repositório"
+        return f"{branch} @ {Eval._git(where, 'rev-parse', '--short', ref)}"
 
     @staticmethod
     def runs_of(eval_file: Path) -> list:

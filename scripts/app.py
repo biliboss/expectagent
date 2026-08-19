@@ -33,11 +33,7 @@ from monsterui.all import (
     H4,
     Label,
     LabelT,
-    LiStep,
     Small,
-    Steps,
-    StepsT,
-    StepT,
     Strong,
     Subtitle,
     Summary,
@@ -74,7 +70,7 @@ class App:
                     Small("nada é construído antes daqui"),
                     Button(
                         "confirmar",
-                        Small(" ⌘⏎"),
+                        Small("⌘⏎", cls="ml-2"),
                         cls=ButtonT.primary,
                         hx_post="/confirm",
                         hx_target="#eval-body",
@@ -119,6 +115,29 @@ class App:
                     Subtitle("agora o agente pode ser construído contra isto"),
                 ),
                 footer=Small(CodeSpan("expectagent run")),
+            )
+
+    class UnreadableTemplate:
+        """The content came back, and it is not an eval.
+
+        `Eval.open` reads the file as of HEAD and, when it is not in that commit,
+        returns git's own words instead — on purpose, so nobody confirms a spec that
+        was never committed. Those words then went straight into the YAML parser and
+        took the screen down with a 500, which showed the person nothing at all.
+        Here they are the screen.
+        """
+
+        def __new__(cls, content: str, why: str) -> FT:
+            return Card(
+                DivVStacked(
+                    Small(why, cls=TextPresets.muted_sm),
+                    CodeBlock(content[:2000]),
+                    cls="items-start gap-3 w-full",
+                ),
+                header=DivCentered(
+                    H1("não deu pra ler este arquivo"),
+                    Subtitle("nada é confirmado a partir daqui"),
+                ),
             )
 
     class FileSourceNotSetTemplate:
@@ -174,7 +193,20 @@ class App:
 
                     @staticmethod
                     def leaves(value, path: str = "") -> list:
-                        """Walk to the leaves; a leaf is a list or a scalar."""
+                        """Walk to the leaves; a leaf is a scalar or a list of them.
+
+                        A list that holds dicts keeps walking — the first cut stopped
+                        there and joined them with `str`, which put Python's repr back
+                        on the screen for any nested structure. It is the same defect
+                        as printing a dict, one level down.
+                        """
+                        deep = App.EvalsTemplate.RunViewWidget.Turn.Rules.leaves
+                        if isinstance(value, list) and any(isinstance(i, dict) for i in value):
+                            return [
+                                leaf
+                                for position, item in enumerate(value, 1)
+                                for leaf in deep(item, f"{path} {position}".strip())
+                            ]
                         if not isinstance(value, dict):
                             items = value if isinstance(value, list) else [value]
                             return [(path, " · ".join(str(i) for i in items))]
@@ -186,42 +218,94 @@ class App:
                             )
                         ]
 
-                    def __new__(cls, verb: str, value: dict) -> FT:
-                        return DivVStacked(
+                    def __new__(cls, verb: str, value) -> FT:
+                        # A grid, not a flex row: the label column is fixed so every
+                        # rule in a case lines up on the same edge, and the value
+                        # column takes the rest. As a flex row the value was squeezed
+                        # to its label's width and wrapped four words deep.
+                        return Div(
                             *[
-                                DivLAligned(
-                                    Small(f"{verb} {path}", cls=TextPresets.muted_sm),
-                                    CodeSpan(text),
-                                    cls="gap-3 items-baseline",
-                                )
+                                part
                                 for path, text in cls.leaves(value)
+                                for part in (
+                                    Small(f"{verb} {path}".strip(), cls=TextPresets.muted_sm),
+                                    CodeSpan(text, cls="justify-self-start"),
+                                )
                             ],
-                            cls="items-start gap-1",
+                            cls="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 items-baseline w-full",
                         )
 
-                def __new__(cls, turn: dict) -> FT:
+                def __new__(cls, turn: dict, position: int) -> FT:
                     verb = Eval.turn_verb(turn)
                     value = turn[verb]
-                    return LiStep(
-                        cls.Rules(verb, value)
-                        if isinstance(value, dict)
-                        else CodeSpan(f"{verb}: {value}"),
-                        Small(f"happened: {turn['happened']}") if "happened" in turn else "",
-                        cls=StepT.error if "happened" in turn else StepT.neutral,
-                        data_content="✗" if "happened" in turn else None,
+                    broke = "happened" in turn
+                    # A turn is not only its verb: `input`, `args`, `mock`, `returns`
+                    # and `times` are fields of the same step, and the screen dropped
+                    # them. The message the agent must SEND lived in `input`, so the
+                    # one promise a person most needs to read was the invisible half.
+                    fields = {k: v for k, v in turn.items() if k not in (verb, "happened")}
+                    return Tr(
+                        Td(
+                            Label("✗", cls=LabelT.destructive) if broke else Small(str(position)),
+                            cls="align-top w-10 pt-1",
+                        ),
+                        Td(
+                            cls.Rules(verb, value)
+                            if isinstance(value, dict)
+                            else CodeSpan(f"{verb}: {value}"),
+                            *[cls.Rules(name, held) for name, held in fields.items()],
+                            Small(f"happened: {turn['happened']}", cls=TextPresets.muted_sm)
+                            if broke
+                            else "",
+                            cls="align-top space-y-1",
+                        ),
                     )
 
             class Trace:
                 """Molecule — the turns of one case, in order.
 
-                Numbered markers because the sequence is real: in this format the
-                ORDER of the lines IS the assertion.
+                Numbered rows because the sequence is real: in this format the ORDER
+                of the lines IS the assertion.
+
+                A table and not `Steps`: the stepper equalised its items and opened
+                130px of nothing between one-line turns, so a nine-turn case ran three
+                screens for the content of one. Rows put the numbers on a column the
+                eye can run down, which is the only thing the rail was buying.
                 """
 
                 def __new__(cls, turns: list) -> FT:
-                    return Steps(
-                        *[App.EvalsTemplate.RunViewWidget.Turn(t) for t in turns],
-                        cls=StepsT.vertical,
+                    return Table(
+                        Tbody(
+                            *[
+                                App.EvalsTemplate.RunViewWidget.Turn(t, i)
+                                for i, t in enumerate(turns, 1)
+                            ]
+                        ),
+                        cls="uk-table-small w-full",
+                    )
+
+            class Guardrails:
+                """Molecule — the asserts that hold over the WHOLE case.
+
+                The schema already draws this line: four shapes are named `*Turn` and
+                happen at a position, four are named `*Assert` and are true of the run
+                end to end. Numbering them together said `tools.only` happens after the
+                last step, when it is a constraint on every step — the screen was
+                asserting something the format does not.
+                """
+
+                KINDS = ("tools", "budget", "judge", "min_score")
+
+                def __new__(cls, asserts: list) -> FT:
+                    return Card(
+                        *[
+                            App.EvalsTemplate.RunViewWidget.Turn.Rules(
+                                Eval.turn_verb(a), a[Eval.turn_verb(a)]
+                            )
+                            for a in asserts
+                        ],
+                        header=Small("vale para o caso inteiro", cls=TextPresets.muted_sm),
+                        cls="mt-4 w-full",
                     )
 
             class Cases:
@@ -239,21 +323,36 @@ class App:
                 # thing on screen the person is actually agreeing to.
                 SETTINGS = "expectagent"
 
+                class Case:
+                    """Molecule — one case: its name, its ordered trace, its guardrails."""
+
+                    def __new__(cls, name: str, turns) -> FT:
+                        if not isinstance(turns, list):
+                            return Div(H4(name), Small(str(turns)), cls="w-full space-y-2")
+                        widget = App.EvalsTemplate.RunViewWidget
+                        steps = [t for t in turns if Eval.turn_verb(t) not in widget.Guardrails.KINDS]
+                        rules = [t for t in turns if Eval.turn_verb(t) in widget.Guardrails.KINDS]
+                        # A plain block, not `DivVStacked`: that one carries
+                        # `items-center`, and an `items-start` beside it does not win —
+                        # same Tailwind family, so the stylesheet's order decides, not
+                        # the attribute's. The case name drifted to the middle while
+                        # its own trace sat left.
+                        return Div(
+                            H4(name),
+                            widget.Trace(steps),
+                            widget.Guardrails(rules) if rules else "",
+                            cls="w-full space-y-2",
+                        )
+
                 def __new__(cls, cases: list) -> FT:
-                    return DivVStacked(
+                    return Div(
                         *[
-                            DivVStacked(
-                                H4(name),
-                                App.EvalsTemplate.RunViewWidget.Trace(turns)
-                                if isinstance(turns, list)
-                                else Small(str(turns)),
-                                cls="items-start gap-2 w-full",
-                            )
+                            cls.Case(name, turns)
                             for case in cases
                             for name, turns in case.items()
                             if name != cls.SETTINGS
                         ],
-                        cls="items-start gap-8 w-full",
+                        cls="w-full space-y-8",
                     )
 
             def __new__(cls, run: dict) -> FT:
@@ -332,9 +431,13 @@ class App:
                 )
 
         def __new__(cls, runs: list, selected: int) -> FT:
-            return DivVStacked(
+            # A block, for the same reason the case list is one: `DivVStacked` centres
+            # its children, and the run card came out narrow in the middle of a wide
+            # window with the trace crammed into half of it.
+            return Div(
                 cls.RunViewWidget(runs[selected]),
                 cls.RunsWidget(runs, runs[selected]),
+                cls="w-full space-y-4",
             )
 
     def __new__(cls, file_source: str | None, selected: int = 0, confirmed: bool = False) -> FT:
@@ -351,7 +454,12 @@ class App:
         if file_source is None:
             return Container(cls.FileSourceNotSetTemplate(), id="eval-body")
 
-        spec, runs = Eval.read(file_source)
+        try:
+            spec, runs = Eval.read(file_source)
+        except Exception as unreadable:
+            return Container(
+                cls.UnreadableTemplate(file_source, str(unreadable)), id="eval-body"
+            )
         # `?run=` comes from the address bar, so it is clamped rather than trusted:
         # an out-of-range index would be an IndexError served as a 500.
         selected = min(max(selected, 0), len(runs) - 1) if runs else 0
